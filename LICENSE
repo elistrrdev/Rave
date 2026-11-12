@@ -13,7 +13,7 @@ PLEASE READ THIS AGREEMENT CAREFULLY BEFORE INSTALLING OR USING RAVE. BY CLICKIN
 
 1.2 "You" and "your" mean the natural person who installs, starts or otherwise uses Rave. If you use Rave on behalf of an organization, "you" also means that organization, and you confirm that you are allowed to accept this Agreement for it.
 
-1.3 "Rave" or the "Software" means the Rave launcher, the Rave Setup program (Rave-Installer.exe), the uninstaller, any portable or test build (for example Test-Rave.exe), the built-in anticheat and all of its components, including every update, upgrade, fix, patch, new version, configuration file, image, logo, icon, text, layout, design, documentation and any other material that the Developer provides together with or for Rave, in source code or in object code form.
+1.3 "Rave" or the "Software" means the Rave launcher, the Rave Setup program (Rave-Installer.exe), the uninstaller, the built-in anticheat and all of its components, including every update, upgrade, fix, patch, new version, configuration file, image, logo, icon, text, layout, design, documentation and any other material that the Developer provides together with or for Rave, in source code or in object code form.
 
 1.4 "Third-Party Components" means software, fonts and other material that was created by persons other than the Developer and that is included in Rave under its own license terms. They are listed in Section 20 and Appendix A.
 
@@ -48,7 +48,7 @@ PLEASE READ THIS AGREEMENT CAREFULLY BEFORE INSTALLING OR USING RAVE. BY CLICKIN
 
 4.2 You may make one backup copy of the Rave Setup program for your own use, provided that the backup keeps all copyright notices and this Agreement.
 
-4.3 If you received a test build, a preview, a beta or any other unreleased version of Rave, you may only use it for testing and giving feedback to the Developer, and only as long as the Developer allows it.
+4.3 If you received a preview, a beta or any other unreleased version of Rave, you may only use it for trying it out and giving feedback to the Developer, and only as long as the Developer allows it.
 
 
 5. RESTRICTIONS
@@ -136,11 +136,11 @@ Where a law that cannot be excluded allows you to do any of the above (for examp
 9.4 Rave may stop working with older versions of Windows, with older versions of Rave, or with changes made by Roblox Corporation. The Developer does not promise that any version of Rave will keep working for any period of time.
 
 
-10. TEST VERSIONS
+10. EARLY VERSIONS
 
-10.1 Rave version 0.1, and every version marked as test, preview, beta, early access or similar, is an early version. It can contain errors, can be incomplete, can change a lot and can be stopped at any time.
+10.1 Rave version 0.1, and every version marked as preview, beta, early access or similar, is an early version. It can contain errors, can be incomplete, can change a lot and can be stopped at any time.
 
-10.2 Test versions are provided only for testing. You must not share them, publish them, or show them to others as a finished or official release, unless the Developer allows it in writing.
+10.2 Early versions are provided only for trying them out and giving feedback. You must not share them, publish them, or show them to others as a finished or official release, unless the Developer allows it in writing.
 
 
 11. FEEDBACK

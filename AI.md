@@ -2,7 +2,7 @@
 
 ! WHEN YOU BUILD, BUILD A RELEASE VERSION !
 
-! GITHUB REPO https://github.com/elistrrdev/Rave !
+! GITHUB REPO https://github.com/elistrrdev/Rave-SRC !
 
 
 !!! RULE 0 - NO AI COMMENTS. THIS OVERRIDES EVERYTHING BELOW !!!

@@ -31,7 +31,7 @@ Done in code:
 - [x] Installer and uninstaller message boxes follow light/dark too
 - [x] Uninstaller deletes its %TEMP% copy right after it finished
 - [x] build.bat, .gitignore, CODE.md, PLAN.md
-- [x] Pushed to https://github.com/elistrrdev/Rave (main), repo is private (backup only)
+- [x] Pushed to https://github.com/elistrrdev/Rave-SRC (main), repo is private (backup only)
 - [x] Closed source, all rights reserved: `LICENSE` is now the Rave End User License Agreement and Terms of Use with
       Appendix A (third-party notices), shown in the installer and installed as LICENSE.txt
 - [x] Icon font with unknown license removed, close X is drawn directly

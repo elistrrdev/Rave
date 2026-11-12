@@ -108,7 +108,7 @@ Roblox client into its own folder and starts it from there. The built-in antiche
   logo.png: cropped to its visible pixels and scaled with WIC high quality cubic), close icon on the right.
 - Every page is one box at (20, 100), size (window width - 40) x 347.
 - **Home**: "WHAT'S NEW?" box. `news::fetchAsync()` reads
-  `https://api.github.com/repos/elistrrdev/Rave/releases/latest`. A release shows its name, date and body
+  `https://api.github.com/repos/elistrrdev/Rave-SRC/releases/latest`. A release shows its name, date and body
   (simple markdown is stripped, em/en dashes become `-`, long text wraps and scrolls with the mouse wheel).
   No release (404) or no answer shows "no news" centered in the box.
 - **Launch**: log box + buttons.
