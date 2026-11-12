@@ -1215,6 +1215,15 @@ namespace
             return;
         }
 
+        Resource license = loadResource(IDR_LICENSE);
+        std::wstring licenseFile = installDir + L"\\LICENSE.txt";
+        step(L"Extract: LICENSE.txt", 68);
+        if (!license.data || !writeFile(licenseFile, license.data, license.size))
+        {
+            fail(L"Could not write:\r\n" + licenseFile);
+            return;
+        }
+
         step(L"Create shortcuts", 75);
         if (startMenu)
             createShortcut(startMenuShortcut(), exe, installDir);
@@ -1568,6 +1577,7 @@ namespace
 
         deleteFileRetry(exe);
         deleteFileRetry(dir + L"\\uninstall.exe");
+        deleteFileRetry(dir + L"\\LICENSE.txt");
         RemoveDirectoryW(dir.c_str());
 
         DeleteFileW(startMenuShortcut().c_str());

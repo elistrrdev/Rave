@@ -52,7 +52,7 @@ namespace items
     auto tab(const std::string& label, bool cond) noexcept -> bool;
     auto sendLog(std::string log, logType type) noexcept -> void;
     auto renderLogs() noexcept -> void;
-    auto iconButton(const std::string& icon) noexcept -> bool;
+    auto closeButton(const std::string& id, const _V2& size) noexcept -> bool;
 }
 
 template<typename K, typename V>

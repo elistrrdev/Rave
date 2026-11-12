@@ -81,11 +81,9 @@ struct Fonts {
 
     std::vector<float> montSSizes = { 12, 24 };
     std::vector<float> montMSizes = { 14, 16, 18 };
-    std::vector<float> iconSizes = { 18 };
 
     std::vector<ImFont*> montS = std::vector<ImFont*>(montSSizes.size());
     std::vector<ImFont*> montM = std::vector<ImFont*>(montMSizes.size());
-    std::vector<ImFont*> icons = std::vector<ImFont*>(iconSizes.size());
 
     auto RenderFonts() noexcept -> void;
 }; inline Fonts f;
@@ -101,9 +99,6 @@ inline auto Fonts::RenderFonts() noexcept -> void {
 
     for (int i = 0; i < f.montMSizes.size(); i++)
         f.montM[i] = EFONT(__MontM, (f.montMSizes[i]) + 3, cfg);
-
-    for (int i = 0; i < f.iconSizes.size(); i++)
-        f.icons[i] = EFONT(__Icon, (f.iconSizes[i]), cfg);
 }
 
 namespace images {

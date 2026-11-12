@@ -94,7 +94,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="custom\button.cpp" />
-    <ClCompile Include="custom\iconbutton.cpp" />
+    <ClCompile Include="custom\closebutton.cpp" />
     <ClCompile Include="custom\input.cpp" />
     <ClCompile Include="custom\logs.cpp" />
     <ClCompile Include="custom\misc.cpp" />

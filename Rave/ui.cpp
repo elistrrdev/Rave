@@ -489,11 +489,9 @@ void ui::Render() {
 	{
 		ImGuiWindow* window = GetCurrentWindow();
 
-		PushFont(f.icons[0]);
-		SetCursorPos({ window->Size.x - 20 - _C("a").x, 38});
-		if (items::iconButton("a"))
+		SetCursorPos({ window->Size.x - 20 - 14, 41 });
+		if (items::closeButton("##close", { 14, 14 }))
 			ui::RequestClose();
-		PopFont();
 
 		if (tab == tabs::home)
 			homePage(window);
