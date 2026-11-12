@@ -5,10 +5,7 @@
 
 namespace sys
 {
-    enum class Elevation { Started, Cancelled, Failed };
-
     bool isElevated();
-    Elevation relaunchElevated(HWND owner);
 
     DWORD windowsBuild();
     bool isWindows11();

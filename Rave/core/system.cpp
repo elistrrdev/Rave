@@ -21,21 +21,6 @@ bool sys::isElevated()
     return elevated;
 }
 
-sys::Elevation sys::relaunchElevated(HWND owner)
-{
-    std::wstring exe = exePath();
-    SHELLEXECUTEINFOW sei{};
-    sei.cbSize = sizeof(sei);
-    sei.fMask = SEE_MASK_NOASYNC;
-    sei.hwnd = owner;
-    sei.lpVerb = L"runas";
-    sei.lpFile = exe.c_str();
-    sei.nShow = SW_SHOWNORMAL;
-    if (ShellExecuteExW(&sei))
-        return Elevation::Started;
-    return GetLastError() == ERROR_CANCELLED ? Elevation::Cancelled : Elevation::Failed;
-}
-
 DWORD sys::windowsBuild()
 {
     using RtlGetVersionFn = LONG(WINAPI*)(PRTL_OSVERSIONINFOW);

@@ -18,11 +18,11 @@ Done in code:
 - [x] New logo: logo.png in the header, logo-bg.ico (rounded corners) as exe icon, logo.ico for taskbar and shortcuts (assets\)
 - [x] No animations, no intro arrow, tabs switch instantly
 - [x] Home news box reads the latest GitHub release, "no news" while there is none
-- [x] Startup: internet check first (silent exit without internet), then Rave asks for admin itself before the UI
-- [x] Rave.exe has no admin shield, Windows never asks on its own
+- [x] Startup: internet check first (silent exit without internet)
+- [x] Rave runs without admin rights, no UAC prompt, no shield on the icon (only Setup and the uninstaller ask)
 - [x] %LOCALAPPDATA%\Rave created on start, %TEMP%\rave-temp only for crash and bug reports, no log files
 - [x] Roblox launcher: latest version download (parallel, md5 checked), install, update, launch
-- [x] Roblox starts unelevated even though Rave runs as admin
+- [x] Roblox always starts unelevated, even if Rave is started as admin by hand
 - [x] Windows 11 rounded corners, Windows 10 gets an emulated rounded region
 - [x] Portable build `builds\test\Test-Rave.exe`
 - [x] Installer `builds\installer\Rave-Installer.exe` (wizard, shortcuts, Apps and Features, uninstaller)
@@ -37,7 +37,8 @@ Done in code:
 - [x] Closed source, all rights reserved: `LICENSE` is now the Rave End User License Agreement and Terms of Use with
       Appendix A (third-party notices), shown in the installer and installed as LICENSE.txt
 - [x] Icon font with unknown license removed, close X is drawn directly
-- [x] Decided: no public release of V0.1 (no anticheat yet), first release will be V0.2
+- [x] Decided: no public release of V0.1, first release will be V0.2
+- [x] Decided: no anticheat in Rave (removed from the plan, the license and the installer text)
 
 Waiting for the user:
 
@@ -46,14 +47,15 @@ Waiting for the user:
 - [ ] Test the "Roblox was closed" log line
 - [ ] Test the installer and uninstaller message boxes in light and dark mode, the license page focus line,
       and that %TEMP% has no Rave-Uninstall-*.exe a few seconds after uninstalling
+- [ ] Test that Rave starts without any UAC prompt (Start Menu, Desktop, Test-Rave.exe, "Launch Rave" in Setup)
+      and that LAUNCH ROBLOX, FFlags, settings and the start behaviors still work like before
 - [ ] Test on Windows 10 if possible (corners, blur)
 - [ ] Read the new License Agreement in the installer (and maybe have it checked by a lawyer before V0.2 goes public)
 - [ ] Fill the public releases repo (README.md, LICENSE with the Rave terms) and publish the first release there
 
 ## V0.2
 
-- [ ] Built-in anticheat (the reason Rave asks for admin)
-- [ ] Decide what the anticheat watches and how it reports to the user
+- [ ] Decide the main feature of V0.2
 
 ## Ideas for later (not promised)
 

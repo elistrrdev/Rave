@@ -3,7 +3,7 @@
 # Rave code map
 
 Rave is a Roblox launcher written in C++ (Win32 + DirectX 11 + Dear ImGui). It always downloads the latest
-Roblox client into its own folder and starts it from there. The built-in anticheat arrives with V0.2.
+Roblox client into its own folder and starts it from there.
 
 ## Build
 
@@ -55,7 +55,7 @@ Roblox client into its own folder and starts it from there. The built-in antiche
 |   |   |-- inflate.*      raw DEFLATE decoder (used by zip)
 |   |   |-- zip.*          zip reader/extractor with CRC32 check and path traversal guard
 |   |   |-- paths.*        %LOCALAPPDATA%\Rave, Versions folder, %TEMP%\rave-temp, folder helpers
-|   |   |-- system.*       admin check + elevated relaunch, Windows version, unelevated launch, process lookup, md5
+|   |   |-- system.*       admin check (crash report), Windows version, unelevated launch, process lookup, md5
 |   |   |-- roblox.*       latest version lookup, package download/verify/extract, launch, running check
 |   |   |-- launcher.*     background launch worker, Roblox watcher (start behavior, "closed" log), latest version state
 |   |   |-- fflags.*       FFlags storage (fflags.json), validation, writing ClientAppSettings.json
@@ -78,18 +78,14 @@ Roblox client into its own folder and starts it from there. The built-in antiche
    (`msftconnecttest.com/connecttest.txt`, then the Roblox version API) -> `ExitProcess(0)`.
    No window, no message, no files. This is the "silent fail".
 3. Single instance mutex `Local\RaveSingleInstance`. A second start focuses the existing window and exits.
-4. Admin request, before any window or ImGui exists: if Rave is not elevated it releases the mutex, starts
-   itself again with `sys::relaunchElevated()` (ShellExecute "runas", so Windows shows the UAC prompt) and exits.
-   If the prompt is declined, nothing else happens (silent exit). The elevated instance runs steps 1 to 3 again
-   and continues. Rave.exe itself is `asInvoker`, so the exe icon has no shield and Windows does not ask on its own.
-5. `%LOCALAPPDATA%\Rave` is created and `settings.json` is loaded.
-6. Window, D3D11, ImGui, then `ui::BeforeLoop()` applies the accent, loads fonts and the logo, starts the launcher
+4. `%LOCALAPPDATA%\Rave` is created and `settings.json` is loaded.
+5. Window, D3D11, ImGui, then `ui::BeforeLoop()` applies the accent, loads fonts and the logo, starts the launcher
    monitor and the news request.
-7. While the window is hidden or minimized the loop only handles messages and sleeps 50 ms (no rendering).
+6. While the window is hidden or minimized the loop only handles messages and sleeps 50 ms (no rendering).
 
 ## Folders and files Rave creates
 
-- `%LOCALAPPDATA%\Rave` - created on every start (after admin was granted).
+- `%LOCALAPPDATA%\Rave` - created on every start.
 - `%LOCALAPPDATA%\Rave\fflags.json` - the FFlags from the editor, exactly as typed (a JSON object).
 - `%LOCALAPPDATA%\Rave\settings.json` - `{ "startBehavior": "keep_open" | "minimize" | "hide", "accent": "#rrggbb" }`.
   Missing or broken values fall back to keep_open and #6addbb.
@@ -182,9 +178,10 @@ Roblox client into its own folder and starts it from there. The built-in antiche
    `content-textures3.zip` -> `PlatformContent\pc\textures`). Unknown zips go into the version root.
    `RobloxPlayerInstaller.exe` from the manifest is skipped. No temp files are used for downloads.
 4. `AppSettings.xml` is written, older version folders are removed (locked ones are skipped).
-5. Start: `RobloxPlayerBeta.exe --app` with the version folder as working dir. Because Rave runs elevated,
-   Roblox is started through the Explorer shell (`IShellDispatch2::ShellExecute` on the desktop window) so it
-   runs **unelevated** as a normal Roblox would. If that fails it falls back to CreateProcess.
+5. Start: `RobloxPlayerBeta.exe --app` with the version folder as working dir, through `sys::launchUnelevated()`.
+   Normally Rave runs unelevated and this is a plain CreateProcess. Only if someone starts Rave as administrator
+   by hand, Roblox is started through the Explorer shell (`IShellDispatch2::ShellExecute` on the desktop window)
+   so it still runs **unelevated** as a normal Roblox would (CreateProcess is the fallback).
 6. Progress = half download bytes, half extracted bytes.
 
 ## Window corners
@@ -243,7 +240,7 @@ Roblox client into its own folder and starts it from there. The built-in antiche
 - Writes `Rave.exe`, `LICENSE.txt` and `uninstall.exe` (a copy of the installer), shortcuts, `HKLM\SOFTWARE\Rave` and the
   Apps and Features entry `HKLM\...\Uninstall\Rave`.
 - If Rave is running it asks to close it first.
-- "Launch Rave" on the finish page starts Rave unelevated, Rave then asks for admin itself.
+- "Launch Rave" on the finish page starts Rave unelevated.
 - Uninstall (`uninstall.exe` or `/uninstall`): copies itself to `%TEMP%\Rave-Uninstall-<ticks>.exe` (needed,
   because a running exe can not delete itself), runs from there, removes files, shortcuts and registry keys, asks
   whether `%LOCALAPPDATA%\Rave` should be removed too. At the end it starts a hidden
@@ -255,8 +252,8 @@ Roblox client into its own folder and starts it from there. The built-in antiche
 - Rave is proprietary: "Copyright (c) 2026 elistrrdev. All rights reserved." (also in the VERSIONINFO of both exes).
   The GitHub repo is private and only used as a backup.
 - `LICENSE` is the Rave End User License Agreement and Terms of Use: definitions, acceptance, ownership, license grant
-  (personal, non-commercial), restrictions (no sharing, no reverse engineering, no anticheat tampering, no faking the
-  anticheat), administrator rights and anticheat (V0.1 has no active anticheat), Roblox (not affiliated, official client
+  (personal, non-commercial), restrictions (no sharing, no reverse engineering, no modified builds, no cheats), administrator rights
+  (Rave does not ask for them, only Setup and the uninstaller do), Roblox (not affiliated, official client
   from Roblox servers, Roblox Terms of Use, FFlags at own risk), data and privacy (exact network hosts and local files of
   V0.1), updates, test versions, feedback, support, termination, warranty disclaimer, liability, indemnity, laws,
   consumer rights, governing law, third-party components, general terms, contact.
@@ -267,6 +264,13 @@ Roblox client into its own folder and starts it from there. The built-in antiche
   The uninstaller removes LICENSE.txt again.
 - The text uses one line per paragraph so the installer text box can wrap it. Plain ASCII only.
 - When third-party material changes, Appendix A has to change in the same commit.
+
+## Admin rights
+
+- Rave.exe never asks for admin. It is `asInvoker` (no shield on the icon) and has no UAC request in code.
+  Everything it does (Roblox install in %LOCALAPPDATA%, FFlags, settings, process watch) works with normal rights.
+- Only the installer and uninstaller ask for admin (requireAdministrator).
+- `sys::isElevated()` is only used for the "Administrator: yes/no" line in crash and bug reports.
 
 ## Rules that affect code
 

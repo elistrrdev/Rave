@@ -13,7 +13,7 @@ PLEASE READ THIS AGREEMENT CAREFULLY BEFORE INSTALLING OR USING RAVE. BY CLICKIN
 
 1.2 "You" and "your" mean the natural person who installs, starts or otherwise uses Rave. If you use Rave on behalf of an organization, "you" also means that organization, and you confirm that you are allowed to accept this Agreement for it.
 
-1.3 "Rave" or the "Software" means the Rave launcher, the Rave Setup program (Rave-Installer.exe), the uninstaller, the built-in anticheat and all of its components, including every update, upgrade, fix, patch, new version, configuration file, image, logo, icon, text, layout, design, documentation and any other material that the Developer provides together with or for Rave, in source code or in object code form.
+1.3 "Rave" or the "Software" means the Rave launcher, the Rave Setup program (Rave-Installer.exe), the uninstaller and all of their components, including every update, upgrade, fix, patch, new version, configuration file, image, logo, icon, text, layout, design, documentation and any other material that the Developer provides together with or for Rave, in source code or in object code form.
 
 1.4 "Third-Party Components" means software, fonts and other material that was created by persons other than the Developer and that is included in Rave under its own license terms. They are listed in Section 20 and Appendix A.
 
@@ -57,42 +57,32 @@ Except as expressly allowed by this Agreement or by mandatory law that cannot be
 
 5.1 copy, reproduce, publish, upload, share, mirror, sell, resell, rent, lease, lend, sublicense, distribute or otherwise make Rave or any part of it available to any other person, including through websites, file hosting services, torrents, chat services, game communities or app stores;
 
-5.2 reverse engineer, decompile, disassemble, decrypt, unpack, debug, trace, analyze or otherwise try to find out the source code, structure, algorithms, internal workings, file formats or protocols of Rave, including of its anticheat;
+5.2 reverse engineer, decompile, disassemble, decrypt, unpack, debug, trace, analyze or otherwise try to find out the source code, structure, algorithms, internal workings, file formats or protocols of Rave;
 
 5.3 modify, adapt, translate, patch, crack, hook into, inject code into or create derivative works of Rave, or combine Rave with other software in a way that changes how Rave works;
 
 5.4 remove, hide, change or bypass any copyright notice, trademark, label, license screen, version information, digital signature, integrity check or other protection measure in or around Rave;
 
-5.5 disable, bypass, spoof, tamper with, emulate, imitate or interfere with the Rave anticheat or any of its checks, results, reports or messages, or make it look as if the anticheat is active, running or working when it is not;
+5.5 tell anyone, or let anyone believe, that a modified, unofficial, older or fake version of Rave is the official Rave;
 
-5.6 tell anyone, or let anyone believe, that a modified, unofficial, older or fake version of Rave is the official Rave or that it contains a working Rave anticheat;
+5.6 use Rave, or any information you learned from Rave, to create, test, sell, share or improve cheats, exploits, bots, scripts, macros, injectors or other tools that give an unfair advantage in Roblox or in any other game, or that harm other players;
 
-5.7 use Rave, or any information you learned from Rave, to create, test, sell, share or improve cheats, exploits, bots, scripts, macros, injectors or other tools that give an unfair advantage in Roblox or in any other game, or that harm other players;
+5.7 use Rave in any way that breaks the Roblox Terms of Use, the Roblox Community Standards, any other rules of Roblox Corporation, the rules of a Roblox experience, or any law;
 
-5.8 use Rave in any way that breaks the Roblox Terms of Use, the Roblox Community Standards, any other rules of Roblox Corporation, the rules of a Roblox experience, or any law;
+5.8 use Rave to attack, overload, scrape, spam or harm Roblox, GitHub, Microsoft or any other service, network or person;
 
-5.9 use Rave to attack, overload, scrape, spam or harm Roblox, GitHub, Microsoft or any other service, network or person;
+5.9 use Rave for any commercial purpose, including offering it as part of a paid service, a paid bundle, a paid community, a paid account service or advertising, without prior written permission from the Developer;
 
-5.10 use Rave for any commercial purpose, including offering it as part of a paid service, a paid bundle, a paid community, a paid account service or advertising, without prior written permission from the Developer;
-
-5.11 use Rave or its name, logos, look or design to build or promote a competing product, or to train, test or improve any artificial intelligence or machine learning model.
+5.10 use Rave or its name, logos, look or design to build or promote a competing product, or to train, test or improve any artificial intelligence or machine learning model.
 
 Where a law that cannot be excluded allows you to do any of the above (for example decompiling in a narrow case to make Rave work together with other software), you may do it only to the exact extent that the law requires, and only after first asking the Developer in writing for the needed information.
 
 
-6. ADMINISTRATOR RIGHTS AND THE RAVE ANTICHEAT
+6. ADMINISTRATOR RIGHTS
 
-6.1 Rave asks Windows for administrator rights when it starts. This is needed for the built-in anticheat and for parts of Rave that work with other processes on your computer. If you decline, Rave closes and does not run.
+6.1 Rave does not ask for administrator rights. It runs with the normal rights of your Windows account and starts Roblox without administrator rights, the same way Roblox would run on its own. Only the Rave Setup program and the uninstaller ask Windows for administrator rights, because they install Rave into the Program Files folder, create shortcuts for all users and register Rave in Apps and Features.
 
-6.2 Rave version 0.1 does not contain an active anticheat yet. The anticheat is planned for a later version (currently version 0.2). Nothing in Rave version 0.1 checks for, detects, blocks or reports cheats, and nobody may claim otherwise.
-
-6.3 When an anticheat is part of Rave, it may, while Rave and Roblox are running, look at information on your computer that is needed to find cheating or tampering. This can include, for example, the list of running programs and their names, files and modules that are loaded into Roblox or into Rave, windows that are drawn over Roblox, changes to Rave or Roblox files, and the integrity of Rave itself. The exact checks may change from version to version, and the Developer will describe them in the documentation or release notes of that version. By using a version of Rave that contains the anticheat, you agree to these checks.
-
-6.4 The anticheat does not promise to find every cheat, and a missing detection does not mean that a player is not cheating. It also does not promise that it will never wrongly flag a program. The Developer is not responsible for any decision that you or anyone else makes based on the anticheat.
-
-6.5 The Rave anticheat is a tool of Rave. It is not made by, approved by or connected to Roblox Corporation, and it is not the anticheat of Roblox. Roblox has its own systems, and Rave does not change, replace or weaken them.
-
-6.6 Because Rave runs with administrator rights, you should only run official Rave builds. Running a modified or unofficial build with administrator rights can seriously harm your computer, your files and your accounts. The Developer is not responsible for any version of Rave that was not provided by the Developer.
+6.2 You should only run official Rave builds. Running a modified or unofficial build, especially with administrator rights, can seriously harm your computer, your files and your accounts. The Developer is not responsible for any version of Rave that was not provided by the Developer.
 
 
 7. ROBLOX AND OTHER THIRD-PARTY SERVICES
@@ -122,7 +112,7 @@ Where a law that cannot be excluded allows you to do any of the above (for examp
 
 8.5 You can remove all data that Rave created by uninstalling Rave and choosing to remove the Rave user data, or by deleting the folders %LOCALAPPDATA%\Rave and %TEMP%\rave-temp yourself.
 
-8.6 If a later version of Rave needs to process more or other data (for example for the anticheat), the Developer will describe this in that version and, where the law requires it, ask for your consent first.
+8.6 If a later version of Rave needs to process more or other data, the Developer will describe this in that version and, where the law requires it, ask for your consent first.
 
 
 9. UPDATES AND CHANGES
@@ -161,7 +151,7 @@ The Developer does not have to provide support, maintenance or help of any kind.
 
 13.3 This Agreement, and all rights that it gives you, end automatically and immediately, without notice, if you break any part of it. The Developer can also end this Agreement, or stop offering Rave, at any time and for any reason.
 
-13.4 When this Agreement ends, you must stop using Rave and delete all copies of it. Sections 3, 5, 6.4 to 6.6, 7, 8.4, 11 and 13 to 22 stay in force after the end of this Agreement.
+13.4 When this Agreement ends, you must stop using Rave and delete all copies of it. Sections 3, 5, 6.2, 7, 8.4, 11 and 13 to 22 stay in force after the end of this Agreement.
 
 
 14. DISCLAIMER OF WARRANTIES

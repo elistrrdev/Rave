@@ -819,8 +819,7 @@ namespace
                 text(dc, titleFont, theme.text, R(176, 16, 312, 50), L"Welcome to Rave V" RAVE_VERSION_WSTR L" Setup");
                 text(dc, bodyFont, theme.text, R(176, 70, 312, 250),
                     L"This wizard will guide you through the installation of Rave V" RAVE_VERSION_WSTR L".\r\n\r\n"
-                    L"Rave is a Roblox launcher that always downloads and starts the latest Roblox version. "
-                    L"Its built-in anticheat follows with Rave V0.2.\r\n\r\n"
+                    L"Rave is a Roblox launcher that always downloads and starts the latest Roblox version.\r\n\r\n"
                     L"It is recommended that you close all other applications before starting Setup.\r\n\r\n"
                     L"Click Next to continue.");
             }

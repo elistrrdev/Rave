@@ -60,7 +60,6 @@ namespace ui
 
 namespace app
 {
-    inline bool elevated = false;
     inline HANDLE instanceMutex = nullptr;
     inline const wchar_t* mutexName = L"Local\\RaveSingleInstance";
 }

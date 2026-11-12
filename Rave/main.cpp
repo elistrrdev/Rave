@@ -4,7 +4,6 @@
 #include "core/report.hpp"
 #include "core/launcher.hpp"
 #include "core/settings.hpp"
-#include "core/system.hpp"
 #include <wincodec.h>
 #include <wrl/client.h>
 
@@ -52,16 +51,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     {
         for (int i = 0; i < 20 && !focusExistingInstance(); ++i)
             Sleep(100);
-        ExitProcess(0);
-    }
-
-    app::elevated = sys::isElevated();
-    if (!app::elevated)
-    {
-        ReleaseMutex(app::instanceMutex);
-        CloseHandle(app::instanceMutex);
-        app::instanceMutex = nullptr;
-        sys::relaunchElevated(nullptr);
         ExitProcess(0);
     }
 
