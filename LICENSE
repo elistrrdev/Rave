@@ -1,0 +1,341 @@
+RAVE END USER LICENSE AGREEMENT AND TERMS OF USE
+
+Copyright (c) 2026 elistrrdev. All rights reserved.
+
+Last updated: November 12, 2026
+
+PLEASE READ THIS AGREEMENT CAREFULLY BEFORE INSTALLING OR USING RAVE. BY CLICKING "I ACCEPT", BY INSTALLING, COPYING, STARTING OR OTHERWISE USING RAVE, YOU AGREE TO BE BOUND BY THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT INSTALL OR USE RAVE, CANCEL THE SETUP AND DELETE ALL COPIES OF RAVE IN YOUR POSSESSION.
+
+
+1. DEFINITIONS
+
+1.1 "Developer", "we", "us" and "our" mean elistrrdev, the author and sole owner of Rave.
+
+1.2 "You" and "your" mean the natural person who installs, starts or otherwise uses Rave. If you use Rave on behalf of an organization, "you" also means that organization, and you confirm that you are allowed to accept this Agreement for it.
+
+1.3 "Rave" or the "Software" means the Rave launcher, the Rave Setup program (Rave-Installer.exe), the uninstaller, any portable or test build (for example Test-Rave.exe), the built-in anticheat and all of its components, including every update, upgrade, fix, patch, new version, configuration file, image, logo, icon, text, layout, design, documentation and any other material that the Developer provides together with or for Rave, in source code or in object code form.
+
+1.4 "Third-Party Components" means software, fonts and other material that was created by persons other than the Developer and that is included in Rave under its own license terms. They are listed in Section 20 and Appendix A.
+
+1.5 "Roblox" means the Roblox platform, the Roblox client, the Roblox websites and all related services operated by Roblox Corporation. Roblox is not part of Rave.
+
+1.6 "Agreement" means this Rave End User License Agreement and Terms of Use, including Appendix A.
+
+
+2. ACCEPTANCE OF THIS AGREEMENT
+
+2.1 This Agreement is a legal agreement between you and the Developer. You accept it by clicking "I accept" in the Rave Setup, or by installing, copying, starting or otherwise using Rave, whichever happens first.
+
+2.2 You confirm that you are old enough to enter into a binding agreement in the country where you live, or that your parent or legal guardian has read and accepted this Agreement on your behalf and agrees to be responsible for your use of Rave.
+
+2.3 You must also be allowed to use Roblox under the Roblox Terms of Use, including its age rules. Rave does not change who may use Roblox.
+
+
+3. OWNERSHIP, ALL RIGHTS RESERVED
+
+3.1 Rave is licensed to you, not sold. The Developer keeps all rights, title and interest in and to Rave, including all copyrights, trademarks, trade secrets, designs, know-how and every other intellectual property right, in every country.
+
+3.2 The name "Rave", the Rave logos and the Rave icons are identifiers of the Developer. Nothing in this Agreement gives you any right to use them, except to refer to Rave in an honest and accurate way.
+
+3.3 The source code of Rave is confidential and is a trade secret of the Developer. Rave is not open source software. No source code is licensed to you under this Agreement.
+
+3.4 All rights that are not expressly granted to you in this Agreement are reserved by the Developer.
+
+
+4. LICENSE GRANT
+
+4.1 Subject to your continuous compliance with this Agreement, the Developer grants you a personal, limited, non-exclusive, non-transferable, non-sublicensable and revocable license to install and use one copy of Rave in object code form on each computer that you own or lawfully control, only for your own private and non-commercial use, and only in the form in which it was provided by the Developer through an official Rave distribution channel.
+
+4.2 You may make one backup copy of the Rave Setup program for your own use, provided that the backup keeps all copyright notices and this Agreement.
+
+4.3 If you received a test build, a preview, a beta or any other unreleased version of Rave, you may only use it for testing and giving feedback to the Developer, and only as long as the Developer allows it.
+
+
+5. RESTRICTIONS
+
+Except as expressly allowed by this Agreement or by mandatory law that cannot be excluded by contract, you must not, and you must not allow or help anyone else to:
+
+5.1 copy, reproduce, publish, upload, share, mirror, sell, resell, rent, lease, lend, sublicense, distribute or otherwise make Rave or any part of it available to any other person, including through websites, file hosting services, torrents, chat services, game communities or app stores;
+
+5.2 reverse engineer, decompile, disassemble, decrypt, unpack, debug, trace, analyze or otherwise try to find out the source code, structure, algorithms, internal workings, file formats or protocols of Rave, including of its anticheat;
+
+5.3 modify, adapt, translate, patch, crack, hook into, inject code into or create derivative works of Rave, or combine Rave with other software in a way that changes how Rave works;
+
+5.4 remove, hide, change or bypass any copyright notice, trademark, label, license screen, version information, digital signature, integrity check or other protection measure in or around Rave;
+
+5.5 disable, bypass, spoof, tamper with, emulate, imitate or interfere with the Rave anticheat or any of its checks, results, reports or messages, or make it look as if the anticheat is active, running or working when it is not;
+
+5.6 tell anyone, or let anyone believe, that a modified, unofficial, older or fake version of Rave is the official Rave or that it contains a working Rave anticheat;
+
+5.7 use Rave, or any information you learned from Rave, to create, test, sell, share or improve cheats, exploits, bots, scripts, macros, injectors or other tools that give an unfair advantage in Roblox or in any other game, or that harm other players;
+
+5.8 use Rave in any way that breaks the Roblox Terms of Use, the Roblox Community Standards, any other rules of Roblox Corporation, the rules of a Roblox experience, or any law;
+
+5.9 use Rave to attack, overload, scrape, spam or harm Roblox, GitHub, Microsoft or any other service, network or person;
+
+5.10 use Rave for any commercial purpose, including offering it as part of a paid service, a paid bundle, a paid community, a paid account service or advertising, without prior written permission from the Developer;
+
+5.11 use Rave or its name, logos, look or design to build or promote a competing product, or to train, test or improve any artificial intelligence or machine learning model.
+
+Where a law that cannot be excluded allows you to do any of the above (for example decompiling in a narrow case to make Rave work together with other software), you may do it only to the exact extent that the law requires, and only after first asking the Developer in writing for the needed information.
+
+
+6. ADMINISTRATOR RIGHTS AND THE RAVE ANTICHEAT
+
+6.1 Rave asks Windows for administrator rights when it starts. This is needed for the built-in anticheat and for parts of Rave that work with other processes on your computer. If you decline, Rave closes and does not run.
+
+6.2 Rave version 0.1 does not contain an active anticheat yet. The anticheat is planned for a later version (currently version 0.2). Nothing in Rave version 0.1 checks for, detects, blocks or reports cheats, and nobody may claim otherwise.
+
+6.3 When an anticheat is part of Rave, it may, while Rave and Roblox are running, look at information on your computer that is needed to find cheating or tampering. This can include, for example, the list of running programs and their names, files and modules that are loaded into Roblox or into Rave, windows that are drawn over Roblox, changes to Rave or Roblox files, and the integrity of Rave itself. The exact checks may change from version to version, and the Developer will describe them in the documentation or release notes of that version. By using a version of Rave that contains the anticheat, you agree to these checks.
+
+6.4 The anticheat does not promise to find every cheat, and a missing detection does not mean that a player is not cheating. It also does not promise that it will never wrongly flag a program. The Developer is not responsible for any decision that you or anyone else makes based on the anticheat.
+
+6.5 The Rave anticheat is a tool of Rave. It is not made by, approved by or connected to Roblox Corporation, and it is not the anticheat of Roblox. Roblox has its own systems, and Rave does not change, replace or weaken them.
+
+6.6 Because Rave runs with administrator rights, you should only run official Rave builds. Running a modified or unofficial build with administrator rights can seriously harm your computer, your files and your accounts. The Developer is not responsible for any version of Rave that was not provided by the Developer.
+
+
+7. ROBLOX AND OTHER THIRD-PARTY SERVICES
+
+7.1 Rave is an independent project. Rave and the Developer are not affiliated with, endorsed by, sponsored by or connected to Roblox Corporation in any way. "Roblox" and the Roblox logos are trademarks of Roblox Corporation. They are used only to describe what Rave works with.
+
+7.2 Rave does not contain the Roblox client. When you start Roblox from Rave, Rave downloads the official Roblox client directly from the servers of Roblox Corporation, checks it with the checksums that Roblox publishes, places it in the Rave folder on your computer and starts it. The Roblox client, its content and all Roblox services stay the property of Roblox Corporation and are subject only to the terms of Roblox Corporation.
+
+7.3 Your use of Roblox is governed by the Roblox Terms of Use and all other rules of Roblox Corporation, which you accept directly with Roblox Corporation. You are solely responsible for following them. The Developer has no control over Roblox, cannot change your Roblox account, cannot restore bans, cannot recover items, and gives no promise about what Roblox Corporation does.
+
+7.4 Roblox Corporation can change or stop the Roblox client, its download servers, its version service or its rules at any time. This can stop Rave from working, fully or partly, until Rave is updated, or forever. The Developer is not responsible for this.
+
+7.5 FFlags (Fast Flags). Rave contains an FFlags editor that writes settings, which you choose, into a configuration file of the Roblox client. FFlags are internal settings of Roblox. Roblox Corporation decides which FFlags the client accepts, and it can ignore, limit or block them at any time. Changing FFlags can make Roblox unstable, slow, ugly or unusable, and some changes may be against the rules of Roblox or of a Roblox experience. You use the FFlags editor entirely at your own risk and you are solely responsible for every FFlag you set, import or share. If something goes wrong, you can empty the FFlags editor and save it to remove your FFlags.
+
+7.6 Rave can open or use other third-party services, such as GitHub (to show the latest Rave news) and Microsoft (to check whether your computer is online). These services belong to their owners and have their own terms and privacy rules. The Developer is not responsible for them.
+
+
+8. YOUR DATA AND PRIVACY
+
+8.1 Rave does not have user accounts, does not ask for your Roblox password, does not read your Roblox account data, does not show advertising and does not contain tracking or telemetry. Rave does not send any personal data to the Developer.
+
+8.2 Rave connects to the internet only for its own functions. In version 0.1 these are: a connection check with Microsoft (www.msftconnecttest.com), the Roblox version service and the Roblox download servers (clientsettingscdn.roblox.com and setup.rbxcdn.com), and the GitHub API (api.github.com) to show the latest Rave news. Like any internet connection, these services can see your IP address and that a request was made. Their own privacy rules apply.
+
+8.3 Rave stores its files only on your computer, mainly in the folder %LOCALAPPDATA%\Rave. These are the Roblox client versions that Rave downloaded, your FFlags (fflags.json) and your Rave settings (settings.json). Rave does not write log files.
+
+8.4 If Rave crashes, or if a Roblox download, install or start fails, Rave may create a crash report or a bug report in the folder %TEMP%\rave-temp. These reports can contain your Windows version, whether Rave had administrator rights, technical error details and a memory snapshot of Rave at the moment of the crash. They stay on your computer. They are never sent automatically. You decide whether you want to send them to the Developer, and if you do, you agree that the Developer may use them to find and fix problems.
+
+8.5 You can remove all data that Rave created by uninstalling Rave and choosing to remove the Rave user data, or by deleting the folders %LOCALAPPDATA%\Rave and %TEMP%\rave-temp yourself.
+
+8.6 If a later version of Rave needs to process more or other data (for example for the anticheat), the Developer will describe this in that version and, where the law requires it, ask for your consent first.
+
+
+9. UPDATES AND CHANGES
+
+9.1 The Developer may, but does not have to, provide updates, fixes or new versions of Rave. The Developer may add, change or remove features at any time, including features that you liked or used.
+
+9.2 Each update or new version of Rave is part of the Software and is covered by this Agreement, unless it comes with its own agreement, which then applies instead.
+
+9.3 The Developer may change this Agreement for future versions of Rave. The version of this Agreement that is shown when you install or update Rave applies to that version. If you do not accept a changed Agreement, do not install or use the version that comes with it.
+
+9.4 Rave may stop working with older versions of Windows, with older versions of Rave, or with changes made by Roblox Corporation. The Developer does not promise that any version of Rave will keep working for any period of time.
+
+
+10. TEST VERSIONS
+
+10.1 Rave version 0.1, and every version marked as test, preview, beta, early access or similar, is an early version. It can contain errors, can be incomplete, can change a lot and can be stopped at any time.
+
+10.2 Test versions are provided only for testing. You must not share them, publish them, or show them to others as a finished or official release, unless the Developer allows it in writing.
+
+
+11. FEEDBACK
+
+If you send the Developer ideas, suggestions, bug reports, crash reports or other feedback about Rave, you allow the Developer to use, change and include them in Rave or in any other project, for free, without any duty to you, and without having to name you. You do not have to send feedback.
+
+
+12. SUPPORT
+
+The Developer does not have to provide support, maintenance or help of any kind. Any support that the Developer gives is voluntary and can stop at any time.
+
+
+13. TERM AND TERMINATION
+
+13.1 This Agreement starts when you accept it and stays in force until it ends.
+
+13.2 You can end this Agreement at any time by uninstalling Rave and deleting all copies of Rave in your possession.
+
+13.3 This Agreement, and all rights that it gives you, end automatically and immediately, without notice, if you break any part of it. The Developer can also end this Agreement, or stop offering Rave, at any time and for any reason.
+
+13.4 When this Agreement ends, you must stop using Rave and delete all copies of it. Sections 3, 5, 6.4 to 6.6, 7, 8.4, 11 and 13 to 22 stay in force after the end of this Agreement.
+
+
+14. DISCLAIMER OF WARRANTIES
+
+14.1 TO THE MAXIMUM EXTENT ALLOWED BY APPLICABLE LAW, RAVE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITH ALL FAULTS AND WITHOUT ANY WARRANTY OF ANY KIND, WHETHER EXPRESS, IMPLIED, STATUTORY OR OTHERWISE.
+
+14.2 TO THE MAXIMUM EXTENT ALLOWED BY APPLICABLE LAW, THE DEVELOPER DISCLAIMS ALL WARRANTIES AND CONDITIONS, INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY, SATISFACTORY QUALITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, ACCURACY, QUIET ENJOYMENT, AND ANY WARRANTY THAT MAY ARISE FROM A COURSE OF DEALING OR USAGE OF TRADE.
+
+14.3 WITHOUT LIMITING THE ABOVE, THE DEVELOPER DOES NOT PROMISE THAT RAVE WILL MEET YOUR NEEDS, WORK WITHOUT INTERRUPTION OR ERRORS, BE SECURE, BE FREE OF HARMFUL CODE, WORK WITH YOUR COMPUTER OR WITH ANY VERSION OF ROBLOX OR WINDOWS, KEEP YOUR ROBLOX ACCOUNT SAFE, DETECT ANY CHEAT, OR THAT ANY ERROR WILL BE FIXED.
+
+14.4 YOU USE RAVE AT YOUR OWN RISK. YOU ARE RESPONSIBLE FOR BACKING UP YOUR DATA AND FOR ANY DAMAGE TO YOUR COMPUTER, LOSS OF DATA, OR CONSEQUENCES FOR YOUR ROBLOX ACCOUNT THAT RESULT FROM USING RAVE.
+
+14.5 SOME COUNTRIES DO NOT ALLOW THE EXCLUSION OF CERTAIN WARRANTIES. IN THAT CASE THE ABOVE EXCLUSIONS APPLY ONLY TO THE EXTENT ALLOWED BY THE LAW OF YOUR COUNTRY.
+
+
+15. LIMITATION OF LIABILITY
+
+15.1 TO THE MAXIMUM EXTENT ALLOWED BY APPLICABLE LAW, IN NO EVENT WILL THE DEVELOPER BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY OR PUNITIVE DAMAGES, OR FOR ANY LOSS OF DATA, LOSS OF PROFITS, LOSS OF REVENUE, LOSS OF GOODWILL, LOSS OF VIRTUAL ITEMS OR VIRTUAL CURRENCY, LOSS OR SUSPENSION OF ANY ACCOUNT (INCLUDING ANY ROBLOX ACCOUNT), COMPUTER FAILURE OR MALFUNCTION, OR COST OF REPLACEMENT SOFTWARE OR SERVICES, ARISING OUT OF OR IN CONNECTION WITH RAVE OR THIS AGREEMENT, HOWEVER CAUSED AND UNDER ANY THEORY OF LIABILITY, EVEN IF THE DEVELOPER WAS TOLD ABOUT THE POSSIBILITY OF SUCH DAMAGES.
+
+15.2 TO THE MAXIMUM EXTENT ALLOWED BY APPLICABLE LAW, THE TOTAL LIABILITY OF THE DEVELOPER FOR ALL CLAIMS ARISING OUT OF OR IN CONNECTION WITH RAVE OR THIS AGREEMENT IS LIMITED TO THE AMOUNT THAT YOU PAID TO THE DEVELOPER FOR RAVE IN THE TWELVE MONTHS BEFORE THE CLAIM AROSE. IF RAVE WAS PROVIDED TO YOU FOR FREE, THIS AMOUNT IS ZERO, TO THE EXTENT THE LAW ALLOWS IT.
+
+15.3 NOTHING IN THIS AGREEMENT LIMITS OR EXCLUDES ANY LIABILITY THAT CANNOT BE LIMITED OR EXCLUDED BY LAW, SUCH AS LIABILITY FOR INTENT, FOR GROSS NEGLIGENCE WHERE THE LAW REQUIRES IT, FOR DEATH OR PERSONAL INJURY CAUSED BY NEGLIGENCE, FOR FRAUD, OR UNDER MANDATORY PRODUCT LIABILITY LAW.
+
+15.4 THE LIMITATIONS IN THIS SECTION APPLY EVEN IF A REMEDY FAILS OF ITS ESSENTIAL PURPOSE.
+
+
+16. INDEMNITY
+
+To the extent allowed by applicable law, you agree to defend and hold the Developer harmless from any claim, demand, loss, damage, cost and expense (including reasonable legal fees) that a third party, including Roblox Corporation, brings or causes against the Developer because of your breach of this Agreement, your breach of the Roblox Terms of Use, your misuse of Rave, or your breach of any law or of the rights of another person.
+
+
+17. COMPLIANCE WITH LAWS AND EXPORT
+
+You must use Rave in line with all laws that apply to you, including laws about computers, data protection, consumer protection and export control. You must not use or export Rave in or to any country, person or organization where this is not allowed by applicable export control or sanctions laws.
+
+
+18. CONSUMER RIGHTS
+
+If you are a consumer, you may have rights under the mandatory law of the country where you live that this Agreement cannot change or remove. Nothing in this Agreement limits those rights. If any part of this Agreement is not allowed under such law, that part applies only as far as the law allows.
+
+
+19. GOVERNING LAW AND DISPUTES
+
+19.1 This Agreement is governed by the law of the country of the Developer's habitual residence, excluding its rules on conflict of laws and excluding the United Nations Convention on Contracts for the International Sale of Goods. If you are a consumer, this choice of law does not take away the protection given to you by the mandatory law of the country where you live.
+
+19.2 Before starting any formal dispute, you agree to first contact the Developer and try to solve the problem in good faith.
+
+19.3 To the extent allowed by applicable law, the courts at the habitual residence of the Developer have jurisdiction for all disputes arising out of or in connection with this Agreement. If you are a consumer, you may also use the courts of the country where you live, where the law gives you that right.
+
+
+20. THIRD-PARTY COMPONENTS
+
+20.1 Rave includes Third-Party Components. They are listed, together with their copyright notices and license texts, in Appendix A of this Agreement.
+
+20.2 Each Third-Party Component is licensed to you by its own authors under its own license, as shown in Appendix A, and not under Sections 4 and 5 of this Agreement. Nothing in this Agreement limits any right that a license in Appendix A gives you for that Third-Party Component itself.
+
+20.3 The authors of the Third-Party Components are not responsible for Rave, do not endorse Rave and are not parties to this Agreement. Their names are shown only because their licenses require it.
+
+
+21. GENERAL TERMS
+
+21.1 Entire agreement. This Agreement, including Appendix A, is the entire agreement between you and the Developer about Rave and replaces all earlier statements or agreements about it.
+
+21.2 Severability. If any part of this Agreement is found to be invalid or not enforceable, that part will be applied as far as possible to reflect the original intent, and the rest of this Agreement stays in full force.
+
+21.3 No waiver. If the Developer does not enforce a right or a part of this Agreement, this does not mean that the Developer gives up that right or that part.
+
+21.4 Assignment. You may not transfer this Agreement or any rights under it to anyone else. The Developer may transfer this Agreement, fully or partly, to another person or company, for example together with the Rave project.
+
+21.5 Language. This Agreement is written in English. If it is translated, the English version wins in case of any difference, unless mandatory law says otherwise.
+
+21.6 Headings. Headings are only for easier reading and do not change the meaning of this Agreement.
+
+
+22. CONTACT
+
+Questions about this Agreement or about Rave can be sent to the Developer through the official Rave channels, currently the GitHub profile https://github.com/elistrrdev.
+
+
+BY CLICKING "I ACCEPT", OR BY INSTALLING OR USING RAVE, YOU CONFIRM THAT YOU HAVE READ THIS AGREEMENT, THAT YOU UNDERSTAND IT, AND THAT YOU AGREE TO BE BOUND BY IT.
+
+
+APPENDIX A - THIRD-PARTY NOTICES
+
+Rave includes the Third-Party Components listed below. They are used under the licenses shown here. These licenses apply only to the named components, not to Rave as a whole.
+
+
+A.1 Dear ImGui
+
+Graphical user interface library, including its Win32 and DirectX 11 backends and the FreeType font builder (imgui_freetype).
+Version 1.91.3. https://github.com/ocornut/imgui
+
+The MIT License (MIT)
+
+Copyright (c) 2014-2024 Omar Cornut
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+A.2 stb libraries (stb_truetype, stb_rect_pack, stb_textedit)
+
+Included as part of Dear ImGui. Written by Sean Barrett and contributors. https://github.com/nothings/stb
+
+These libraries are dedicated to the public domain. Where a public domain dedication is not recognized, they are available under the MIT License:
+
+Copyright (c) 2017 Sean Barrett
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+A.3 FreeType
+
+Font rendering library. Version 2.12.1. https://freetype.org
+
+Portions of this software are copyright (c) 1996-2022 The FreeType Project (www.freetype.org). All rights reserved.
+
+FreeType is used under the FreeType License (FTL). The full text of the FreeType License is available at https://freetype.org/license.html and in the file docs/FTL.TXT of the FreeType source distribution.
+
+
+A.4 Montserrat font (Montserrat Medium, Montserrat SemiBold)
+
+Copyright 2011 The Montserrat Project Authors (https://github.com/JulietaUla/Montserrat)
+Designed by Julieta Ulanovsky.
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is copied below, and is also available with a FAQ at: https://openfontlicense.org
+
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide development of collaborative font projects, to support the font creation efforts of academic and linguistic communities, and to provide a free and open framework in which fonts may be shared and improved in partnership with others.
+
+The OFL allows the licensed fonts to be used, studied, modified and redistributed freely as long as they are not sold by themselves. The fonts, including any derivative works, can be bundled, embedded, redistributed and/or sold with any software provided that any reserved names are not used by derivative works. The fonts and derivatives, however, cannot be released under any other type of license. The requirement for fonts to remain under this license does not apply to any document created using the fonts or their derivatives.
+
+DEFINITIONS
+"Font Software" refers to the set of files released by the Copyright Holder(s) under this license and clearly marked as such. This may include source files, build scripts and documentation.
+
+"Reserved Font Name" refers to any names specified as such after the copyright statement(s).
+
+"Original Version" refers to the collection of Font Software components as distributed by the Copyright Holder(s).
+
+"Modified Version" refers to any derivative made by adding to, deleting, or substituting -- in part or in whole -- any of the components of the Original Version, by changing formats or by porting the Font Software to a new environment.
+
+"Author" refers to any designer, engineer, programmer, technical writer or other person who contributed to the Font Software.
+
+PERMISSION & CONDITIONS
+Permission is hereby granted, free of charge, to any person obtaining a copy of the Font Software, to use, study, copy, merge, embed, modify, redistribute, and sell modified and unmodified copies of the Font Software, subject to the following conditions:
+
+1) Neither the Font Software nor any of its individual components, in Original or Modified Versions, may be sold by itself.
+
+2) Original or Modified Versions of the Font Software may be bundled, redistributed and/or sold with any software, provided that each copy contains the above copyright notice and this license. These can be included either as stand-alone text files, human-readable headers or in the appropriate machine-readable metadata fields within text or binary files as long as those fields can be easily viewed by the user.
+
+3) No Modified Version of the Font Software may use the Reserved Font Name(s) unless explicit written permission is granted by the corresponding Copyright Holder. This restriction only applies to the primary font name as presented to the users.
+
+4) The name(s) of the Copyright Holder(s) and the Author(s) of the Font Software shall not be used to promote, endorse or advertise any Modified Version, except to acknowledge the contribution(s) of the Copyright Holder(s) and the Author(s) or with their explicit written permission.
+
+5) The Font Software, modified or unmodified, in part or in whole, must be distributed entirely under this license, and must not be distributed under any other license. The requirement for fonts to remain under this license does not apply to any document created using the Font Software.
+
+TERMINATION
+This license becomes null and void if any of the above conditions are not met.
+
+DISCLAIMER
+THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM OTHER DEALINGS IN THE FONT SOFTWARE.
+
+
+A.5 Microsoft Windows components
+
+Rave uses programming interfaces that are part of Microsoft Windows (for example DirectX 11, WinHTTP, Windows Imaging Component and the Windows Shell). These are part of your Windows installation, are not included in Rave, and are licensed to you by Microsoft under the Windows license terms. The C and C++ runtime code that the Microsoft Visual C++ compiler links into Rave is used under the license terms of Microsoft Visual Studio.
+
+End of the Rave End User License Agreement and Terms of Use.
