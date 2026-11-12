@@ -59,7 +59,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d11.lib;dxgi.lib;dwmapi.lib;winhttp.lib;windowscodecs.lib;bcrypt.lib;dbghelp.lib;ole32.lib;oleaut32.lib;shell32.lib;uuid.lib;advapi32.lib;user32.lib;gdi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d3d11.lib;dxgi.lib;dwmapi.lib;winhttp.lib;windowscodecs.lib;bcrypt.lib;dbghelp.lib;crypt32.lib;ole32.lib;oleaut32.lib;shell32.lib;uuid.lib;advapi32.lib;user32.lib;gdi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <UACExecutionLevel>AsInvoker</UACExecutionLevel>
     </Link>
     <Manifest>
@@ -85,7 +85,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d11.lib;dxgi.lib;dwmapi.lib;winhttp.lib;windowscodecs.lib;bcrypt.lib;dbghelp.lib;ole32.lib;oleaut32.lib;shell32.lib;uuid.lib;advapi32.lib;user32.lib;gdi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d3d11.lib;dxgi.lib;dwmapi.lib;winhttp.lib;windowscodecs.lib;bcrypt.lib;dbghelp.lib;crypt32.lib;ole32.lib;oleaut32.lib;shell32.lib;uuid.lib;advapi32.lib;user32.lib;gdi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <UACExecutionLevel>AsInvoker</UACExecutionLevel>
     </Link>
     <Manifest>
@@ -99,16 +99,17 @@
     <ClCompile Include="custom\logs.cpp" />
     <ClCompile Include="custom\misc.cpp" />
     <ClCompile Include="custom\tab.cpp" />
+    <ClCompile Include="core\accounts.cpp" />
     <ClCompile Include="core\fflags.cpp" />
     <ClCompile Include="core\inflate.cpp" />
     <ClCompile Include="core\json.cpp" />
     <ClCompile Include="core\launcher.cpp" />
     <ClCompile Include="core\net.cpp" />
-    <ClCompile Include="core\news.cpp" />
     <ClCompile Include="core\paths.cpp" />
     <ClCompile Include="core\report.cpp" />
     <ClCompile Include="core\roblox.cpp" />
     <ClCompile Include="core\settings.cpp" />
+    <ClCompile Include="core\sysinfo.cpp" />
     <ClCompile Include="core\system.cpp" />
     <ClCompile Include="core\zip.cpp" />
     <ClCompile Include="main.cpp" />
@@ -127,16 +128,17 @@
     <ClInclude Include="custom\custom.hpp" />
     <ClInclude Include="main.hpp" />
     <ClInclude Include="version.hpp" />
+    <ClInclude Include="core\accounts.hpp" />
     <ClInclude Include="core\fflags.hpp" />
     <ClInclude Include="core\json.hpp" />
     <ClInclude Include="core\inflate.hpp" />
     <ClInclude Include="core\launcher.hpp" />
     <ClInclude Include="core\net.hpp" />
-    <ClInclude Include="core\news.hpp" />
     <ClInclude Include="core\paths.hpp" />
     <ClInclude Include="core\report.hpp" />
     <ClInclude Include="core\roblox.hpp" />
     <ClInclude Include="core\settings.hpp" />
+    <ClInclude Include="core\sysinfo.hpp" />
     <ClInclude Include="core\system.hpp" />
     <ClInclude Include="core\zip.hpp" />
     <ClInclude Include="__ext\fonts.h" />

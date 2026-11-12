@@ -1,9 +1,11 @@
 #include "colors.hpp"
+#include "core/accounts.hpp"
 #include "core/fflags.hpp"
 #include "core/launcher.hpp"
-#include "core/news.hpp"
 #include "core/settings.hpp"
+#include "core/sysinfo.hpp"
 #include "core/system.hpp"
+#include <thread>
 
 static std::string windowsName;
 
@@ -169,8 +171,9 @@ void ui::BeforeLoop(ID3D11Device* dvc) {
 	launcher::setWindow(window::dx::hwnd);
 
 	windowsName = sys::windowsName();
+	std::thread([] { sysinfo::get(); }).detach();
 
-	launcher::setLogger([](const std::string& text, launcher::LogLevel level) {
+	launcher::Logger logger = [](const std::string& text, launcher::LogLevel level) {
 		logType type = logType::info;
 		switch (level)
 		{
@@ -180,9 +183,11 @@ void ui::BeforeLoop(ID3D11Device* dvc) {
 		default: break;
 		}
 		items::sendLog(text, type);
-	});
+	};
+	launcher::setLogger(logger);
+	accounts::setLogger(logger);
+	accounts::load();
 	launcher::startMonitor();
-	news::fetchAsync();
 }
 
 static std::string launchLabel()
@@ -200,45 +205,113 @@ static std::string launchLabel()
 	}
 }
 
+static float wrapText(ImGuiWindow* window, const _V2& localPos, const _V4& color, const std::string& text, float width)
+{
+	_V2 pos = window->Pos + localPos - _V2(window->Scroll.x, window->Scroll.y);
+	window->DrawList->AddText(GetFont(), GetFontSize(), pos, _CO(color), text.c_str(), nullptr, width);
+	return CalcTextSize(text.c_str(), nullptr, false, width).y;
+}
+
+namespace avatars
+{
+	static std::map<uint64_t, ID3D11ShaderResourceView*> textures;
+
+	static ID3D11ShaderResourceView* get(uint64_t id)
+	{
+		auto it = textures.find(id);
+		if (it != textures.end())
+			return it->second;
+		std::string png;
+		if (!accounts::avatarPng(id, png))
+			return nullptr;
+		gfx::Image img;
+		ID3D11ShaderResourceView* view = nullptr;
+		if (gfx::decodeImage(png.data(), png.size(), 40, img, false))
+			view = gfx::createTexture(logo::device, img);
+		textures[id] = view;
+		return view;
+	}
+
+	static void forget(uint64_t id)
+	{
+		auto it = textures.find(id);
+		if (it == textures.end())
+			return;
+		if (it->second)
+			it->second->Release();
+		textures.erase(it);
+	}
+}
+
+namespace addacc
+{
+	static bool openRequest = false;
+	static bool cookieMode = false;
+	static char cookie[4096];
+	static unsigned addedAtOpen = 0;
+	static unsigned qrShown = 0xFFFFFFFF;
+	static ID3D11ShaderResourceView* qrTexture = nullptr;
+	static const char* kPopup = "ADD ACCOUNT";
+
+	static void clearCookie()
+	{
+		SecureZeroMemory(cookie, sizeof(cookie));
+	}
+
+	static void open()
+	{
+		cookieMode = false;
+		clearCookie();
+		accounts::resetPaste();
+		addedAtOpen = accounts::addedCount();
+		accounts::startQuick();
+		openRequest = true;
+	}
+
+	static void close()
+	{
+		accounts::cancelQuick();
+		accounts::resetPaste();
+		clearCookie();
+		ClearActiveID();
+		CloseCurrentPopup();
+	}
+
+	static void refreshQr(unsigned version)
+	{
+		if (version == qrShown)
+			return;
+		qrShown = version;
+		if (qrTexture)
+		{
+			qrTexture->Release();
+			qrTexture = nullptr;
+		}
+		std::string png = accounts::qrPng();
+		gfx::Image img;
+		if (!png.empty() && gfx::decodeImage(png.data(), png.size(), 132, img, false, true))
+			qrTexture = gfx::createTexture(logo::device, img);
+	}
+
+	static std::string spacedCode(const std::string& code)
+	{
+		if (code.empty())
+			return "- - - - - -";
+		std::string out;
+		for (size_t i = 0; i < code.size(); ++i)
+		{
+			if (i)
+				out += ' ';
+			out += code[i];
+		}
+		return out;
+	}
+}
+
 static void homePage(ImGuiWindow* window)
 {
 	SetCursorPos({ 20, 100 });
-	misc::child("NEWS", { window->Size.x - 40, 347 });
-	{
-		ImGuiWindow* c = GetCurrentWindow();
-
-		PushFont(f.montS[1]);
-		draw::text("WHAT'S NEW?", { 22, 22 }, colors::Lwhite);
-		PopFont();
-
-		news::State state = news::state();
-		if (state == news::State::Ready)
-		{
-			news::Item item = news::item();
-			std::string title = item.title;
-			if (!item.date.empty())
-				title += " -- " + item.date;
-
-			SetCursorPos({ 22, 77 });
-			misc::announcement(title, item.body);
-			Dummy({ 1, 22 });
-		}
-		else if (state == news::State::None)
-		{
-			PushFont(f.montM[1]);
-			_V2 size = _C("no news");
-			SetCursorPos({ (c->Size.x - size.x) / 2, (c->Size.y - size.y) / 2 });
-			draw::text("no news", {}, colors::Gray);
-			PopFont();
-		}
-	}
-	EndChild();
-}
-
-static void launchPage(ImGuiWindow* window)
-{
-	SetCursorPos({ 20, 100 });
-	misc::child("LAUNCH", { window->Size.x - 40, 347 });
+	misc::child("HOME", { window->Size.x - 40, 347 });
 	{
 		ImGuiWindow* c = GetCurrentWindow();
 		PushStyleVar(ImGuiStyleVar_ItemSpacing, { 12, 12 });
@@ -273,12 +346,144 @@ static void launchPage(ImGuiWindow* window)
 	EndChild();
 }
 
-static void statePage(ImGuiWindow* window)
+static void accountRow(const accounts::Account& account, bool selected, float width)
+{
+	static uint64_t confirmId = 0;
+	static double confirmUntil = 0;
+
+	ImGuiWindow* w = GetCurrentWindow();
+	ImDrawList* dl = w->DrawList;
+	const _V2 pos = w->DC.CursorPos;
+	const float height = 58;
+
+	_V4 bg = selected ? colors::withAlpha(colors::Main, 0.10f) : _V4(RGBA(255, 255, 255, 8));
+	dl->AddRectFilled(pos, pos + _V2(width, height), _CO(bg), 8.f);
+	if (selected)
+		dl->AddRect(pos, pos + _V2(width, height), _CO(colors::withAlpha(colors::Main, 0.55f)), 8.f, 0, 1.f);
+
+	const _V2 avatarPos = pos + _V2(10, 9);
+	const _V2 avatarSize = { 40, 40 };
+	dl->AddRectFilled(avatarPos, avatarPos + avatarSize, _CO(_V4(RGBA(255, 255, 255, 18))), 20.f);
+	if (ID3D11ShaderResourceView* tex = avatars::get(account.id))
+	{
+		dl->AddImageRounded((ImTextureID)tex, avatarPos, avatarPos + avatarSize, { 0, 0 }, { 1, 1 }, IM_COL32_WHITE, 20.f);
+	}
+	else if (!account.name.empty())
+	{
+		PushFont(f.montS[0]);
+		std::string initial(1, (char)toupper((unsigned char)account.name[0]));
+		_V2 size = _C(initial.c_str());
+		dl->AddText(avatarPos + (avatarSize - size) / 2, _CO(colors::Lwhite), initial.c_str());
+		PopFont();
+	}
+
+	std::string title = account.displayName.empty() ? account.name : account.displayName;
+	PushFont(f.montM[1]);
+	dl->AddText(pos + _V2(62, 9), _CO(colors::Lwhite), title.c_str());
+	PopFont();
+
+	std::string sub = "@" + account.name;
+	_V4 subColor = colors::Gray;
+	if (account.expired)
+	{
+		sub += " - login expired, add it again";
+		subColor = colors::Red;
+	}
+	dl->AddText(pos + _V2(62, 33), _CO(subColor), sub.c_str());
+
+	const _V2 btn = { 92, 32 };
+	const float btnY = pos.y + (height - btn.y) / 2;
+	const std::string id = std::to_string(account.id);
+
+	SetCursorScreenPos({ pos.x + width - 10 - btn.x, btnY });
+	bool confirming = confirmId == account.id && GetTime() < confirmUntil;
+	if (items::choice((confirming ? "SURE?##rm" : "REMOVE##rm") + id, false, btn))
+	{
+		if (confirming)
+		{
+			confirmId = 0;
+			avatars::forget(account.id);
+			accounts::remove(account.id);
+		}
+		else
+		{
+			confirmId = account.id;
+			confirmUntil = GetTime() + 3.0;
+		}
+	}
+
+	SetCursorScreenPos({ pos.x + width - 10 - btn.x * 2 - 8, btnY });
+	if (items::choice((selected ? "IN USE##use" : "USE##use") + id, selected, btn) && !selected)
+		accounts::select(account.id);
+
+	SetCursorScreenPos(pos);
+	Dummy({ width, height });
+}
+
+static void accountsPage(ImGuiWindow* window)
 {
 	SetCursorPos({ 20, 100 });
-	misc::child("STATE", { window->Size.x - 40, 347 });
+	misc::child("ACCOUNTS", { window->Size.x - 40, 347 });
 	{
+		ImGuiWindow* c = GetCurrentWindow();
+		const float inner = c->Size.x - 40;
+
+		PushFont(f.montM[0]);
+
+		std::vector<accounts::Account> list = accounts::list();
+		uint64_t selected = accounts::selected();
+
+		SetCursorPos({ 20, 20 });
+		misc::child2("ACCOUNT_LIST", { inner, 250 });
+		{
+			ImGuiWindow* l = GetCurrentWindow();
+			if (list.empty())
+			{
+				PushFont(f.montM[1]);
+				const char* title = "No accounts added yet";
+				_V2 ts = _C(title);
+				draw::text(title, { (l->Size.x - ts.x) / 2, 92 }, colors::Lwhite);
+				PopFont();
+
+				const char* hint = "Add an account and Rave starts Roblox already signed in.";
+				_V2 hs = _C(hint);
+				draw::text(hint, { (l->Size.x - hs.x) / 2, 124 }, colors::Gray);
+			}
+			else
+			{
+				PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0, 8 });
+				SetCursorPos({ 0, 1 });
+				for (const auto& account : list)
+					accountRow(account, account.id == selected, l->Size.x);
+				PopStyleVar();
+			}
+		}
+		EndChild();
+
+		const float half = std::floor((inner - 12) / 2);
+		SetCursorPos({ 20, c->Size.y - 20 - 45 });
+		if (items::button("ADD ACCOUNT", { half, 45 }))
+			addacc::open();
+
+		SetCursorPos({ 20 + half + 12, c->Size.y - 20 - 45 });
+		if (items::choice("USE ROBLOX'S OWN LOGIN", selected == 0, { inner - half - 12, 45 }))
+			accounts::select(0);
+
+		PopFont();
+	}
+	EndChild();
+}
+
+static void infoPage(ImGuiWindow* window)
+{
+	static double copiedAt = -10.0;
+
+	SetCursorPos({ 20, 100 });
+	misc::child("INFO", { window->Size.x - 40, 347 });
+	{
+		ImGuiWindow* c = GetCurrentWindow();
 		launcher::Snapshot snap = launcher::snapshot();
+		const sysinfo::Specs& specs = sysinfo::get();
 
 		PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0, 13 });
 		{
@@ -293,11 +498,205 @@ static void statePage(ImGuiWindow* window)
 			SetCursorPosX(30);
 			misc::row("Latest Roblox: ", snap.latestKnown ? snap.latest : "Checking...");
 
+			SetCursorPosX(30);
+			misc::row("CPU: ", specs.cpu);
+
+			SetCursorPosX(30);
+			misc::row("GPU: ", specs.gpu);
+
+			SetCursorPosX(30);
+			misc::row("RAM: ", specs.ram);
+
+			SetCursorPosX(30);
+			misc::row("Display: ", specs.display);
+
+			SetCursorPosX(30);
+			misc::row("HardwareID: ", specs.hwid);
+
+			_V2 rowMin = GetItemRectMin(), rowMax = GetItemRectMax();
+			bool hovered = IsWindowHovered() && IsMouseHoveringRect(rowMin, rowMax);
+			if (hovered)
+			{
+				SetMouseCursor(ImGuiMouseCursor_Hand);
+				if (IsMouseClicked(ImGuiMouseButton_Left))
+				{
+					SetClipboardText(specs.hwid.c_str());
+					copiedAt = GetTime();
+				}
+			}
+
+			PopFont();
+
+			PushFont(f.montM[0]);
+			const char* note = GetTime() - copiedAt < 2.0 ? "copied" : hovered ? "click to copy" : nullptr;
+			if (note)
+				c->DrawList->AddText(_V2(rowMax.x + 12, rowMax.y - GetFontSize() - 1), _CO(colors::Gray), note);
 			PopFont();
 		}
 		PopStyleVar();
 	}
 	EndChild();
+}
+
+static void addAccountWindow(ImGuiWindow* window)
+{
+	if (addacc::openRequest)
+	{
+		OpenPopup(addacc::kPopup);
+		addacc::openRequest = false;
+	}
+
+	const _V2 size = { 520, 360 };
+	SetNextWindowPos(window->Pos + (window->Size - size) / 2, ImGuiCond_Always);
+	SetNextWindowSize(size, ImGuiCond_Always);
+
+	PushStyleVar(ImGuiStyleVar_WindowPadding, { 0, 0 });
+	if (!BeginPopupModal(addacc::kPopup, nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoSavedSettings))
+	{
+		PopStyleVar();
+		return;
+	}
+
+	if (IsKeyPressed(ImGuiKey_Escape, false) || accounts::addedCount() != addacc::addedAtOpen)
+	{
+		addacc::close();
+		EndPopup();
+		PopStyleVar();
+		return;
+	}
+
+	ImGuiWindow* popup = GetCurrentWindow();
+	const float inner = popup->Size.x - 40;
+
+	SetCursorPos({ 20, 20 });
+	misc::renderMulticolorText({ "ADD ", "ACCOUNT" }, { f.montS[1], f.montS[1] }, { colors::Main, colors::Lwhite });
+
+	PushFont(f.montM[0]);
+
+	const float gap = 10;
+	const _V2 modeSize = { std::floor((inner - gap) / 2), 34 };
+	SetCursorPos({ 20, 64 });
+	if (items::choice("QUICK LOGIN", !addacc::cookieMode, modeSize) && addacc::cookieMode)
+	{
+		addacc::cookieMode = false;
+		addacc::clearCookie();
+		accounts::resetPaste();
+		accounts::startQuick();
+	}
+	SetCursorPos({ 20 + modeSize.x + gap, 64 });
+	if (items::choice("COOKIE", addacc::cookieMode, { inner - modeSize.x - gap, 34 }) && !addacc::cookieMode)
+	{
+		addacc::cookieMode = true;
+		accounts::cancelQuick();
+	}
+
+	if (!addacc::cookieMode)
+	{
+		accounts::Quick q = accounts::quick();
+		addacc::refreshQr(q.qrVersion);
+
+		const _V2 qrPos = { 20, 112 };
+		const _V2 qrBox = { 156, 156 };
+		_V2 screen = popup->Pos + qrPos;
+		if (q.state == accounts::QuickState::Failed)
+		{
+			popup->DrawList->AddRectFilled(screen, screen + qrBox, _CO(_V4(RGBA(255, 255, 255, 12))), 8.f);
+			const _V2 btn = { 120, 34 };
+			SetCursorPos(qrPos + (qrBox - btn) / 2);
+			if (items::choice("NEW CODE", false, btn))
+				accounts::startQuick();
+		}
+		else if (addacc::qrTexture)
+		{
+			popup->DrawList->AddRectFilled(screen, screen + qrBox, IM_COL32_WHITE, 8.f);
+			popup->DrawList->AddImage((ImTextureID)addacc::qrTexture, screen + _V2(12, 12), screen + _V2(144, 144));
+		}
+		else
+		{
+			popup->DrawList->AddRectFilled(screen, screen + qrBox, _CO(_V4(RGBA(255, 255, 255, 12))), 8.f);
+			_V2 dots = _C("...");
+			popup->DrawList->AddText(screen + (qrBox - dots) / 2, _CO(colors::Gray), "...");
+		}
+
+		const float x = 196;
+		const float col = popup->Size.x - 20 - x;
+		draw::text("YOUR CODE", { x, 112 }, colors::Gray);
+
+		PushFont(f.montS[1]);
+		popup->DrawList->AddText(popup->Pos + _V2(x, 132), _CO(colors::Main), addacc::spacedCode(q.code).c_str());
+		PopFont();
+
+		float y = 176;
+		y += wrapText(popup, { x, y }, colors::Lwhite, "On a signed in device, open Roblox Settings > Quick Log In and enter this code, or scan the QR code.", col);
+
+		_V4 statusColor = colors::Gray;
+		switch (q.state)
+		{
+		case accounts::QuickState::Linked: statusColor = colors::Main; break;
+		case accounts::QuickState::SigningIn: statusColor = colors::Main; break;
+		case accounts::QuickState::Done: statusColor = colors::Green; break;
+		case accounts::QuickState::Failed: statusColor = colors::Red; break;
+		default: break;
+		}
+		if (!q.message.empty())
+			wrapText(popup, { x, std::max(y + 12, 236.f) }, statusColor, q.message, col);
+	}
+	else
+	{
+		float y = 112;
+		y += wrapText(popup, { 20, y }, colors::Lwhite, "Paste the .ROBLOSECURITY cookie of the account. Rave checks it with Roblox and keeps it encrypted on this PC.", inner);
+		y += 8;
+		wrapText(popup, { 20, y }, colors::Red, "Never send this cookie to anyone. Whoever has it can use the account without the password.", inner);
+
+		const _V2 boxPos = { 20, 196 };
+		const _V2 boxSize = { inner, 38 };
+		PushStyleVar(ImGuiStyleVar_FramePadding, { 12, 10 });
+		PushStyleVar(ImGuiStyleVar_FrameRounding, 6.f);
+		const _V4 boxColor = RGBA(255, 255, 255, 12);
+		PushStyleColor(ImGuiCol_FrameBg, boxColor);
+		PushStyleColor(ImGuiCol_FrameBgHovered, boxColor);
+		PushStyleColor(ImGuiCol_FrameBgActive, boxColor);
+		PushStyleColor(ImGuiCol_Text, colors::Lwhite);
+		SetCursorPos(boxPos);
+		SetNextItemWidth(boxSize.x);
+		InputText("##cookie", addacc::cookie, sizeof(addacc::cookie), ImGuiInputTextFlags_Password);
+		bool active = IsItemActive();
+		PopStyleColor(4);
+		PopStyleVar(2);
+		if (addacc::cookie[0] == 0 && !active)
+			popup->DrawList->AddText(popup->Pos + boxPos + _V2(12, 10), _CO(colors::Info), "Paste the cookie here");
+
+		const _V2 pasteSize = { 150, 36 };
+		SetCursorPos({ 20, 244 });
+		if (items::choice("PASTE", false, pasteSize))
+		{
+			const char* clip = GetClipboardText();
+			addacc::clearCookie();
+			if (clip)
+				strncpy_s(addacc::cookie, sizeof(addacc::cookie), clip, _TRUNCATE);
+		}
+
+		accounts::Paste paste = accounts::paste();
+		bool checking = paste.state == accounts::PasteState::Checking;
+		SetCursorPos({ 20 + pasteSize.x + gap, 244 });
+		if (items::button(checking ? "CHECKING...###ADDCOOKIE" : "ADD ACCOUNT###ADDCOOKIE", { inner - pasteSize.x - gap, 36 }) && !checking)
+			accounts::addCookie(addacc::cookie);
+
+		if (!paste.message.empty())
+		{
+			_V4 color = paste.state == accounts::PasteState::Failed ? colors::Red : paste.state == accounts::PasteState::Done ? colors::Green : colors::Gray;
+			draw::text(paste.message, { 20, 282 }, color);
+		}
+	}
+
+	SetCursorPos({ 20, popup->Size.y - 20 - 40 });
+	if (items::button("CLOSE", { inner, 40 }))
+		addacc::close();
+
+	PopFont();
+
+	EndPopup();
+	PopStyleVar();
 }
 
 static void fflagsEditor(ImGuiWindow* window)
@@ -481,7 +880,7 @@ static void settingsWindow(ImGuiWindow* window)
 }
 
 void ui::Render() {
-	static int tab = tabs::home;
+	static Tab tab = Tab::Home;
 
 	logo::refresh(accentNow);
 
@@ -493,28 +892,28 @@ void ui::Render() {
 		if (items::closeButton("##close", { 14, 14 }))
 			ui::RequestClose();
 
-		if (tab == tabs::home)
+		if (tab == Tab::Home)
 			homePage(window);
-		else if (tab == tabs::launch)
-			launchPage(window);
-		else if (tab == tabs::state)
-			statePage(window);
+		else if (tab == Tab::Accounts)
+			accountsPage(window);
+		else if (tab == Tab::Info)
+			infoPage(window);
 
 		PushStyleVar(ImGuiStyleVar_ItemSpacing, { 16, 0 });
 		{
 			PushFont(f.montM[1]);
 			SetCursorPos({ 20, 40 });
 
-			if (items::tab("Home", tab == tabs::home))
-				tab = tabs::home;
+			if (items::tab("Home", tab == Tab::Home))
+				tab = Tab::Home;
 
 			SameLine();
-			if (items::tab("Launch", tab == tabs::launch))
-				tab = tabs::launch;
+			if (items::tab("Accounts", tab == Tab::Accounts))
+				tab = Tab::Accounts;
 
 			SameLine();
-			if (items::tab("State", tab == tabs::state))
-				tab = tabs::state;
+			if (items::tab("Info", tab == Tab::Info))
+				tab = Tab::Info;
 
 			if (images::logo)
 				draw::image(images::logo, { (window->Size.x - images::logoSize.x) / 2, 48 - images::logoSize.y / 2 }, images::logoSize, colors::White, 0);
@@ -525,6 +924,7 @@ void ui::Render() {
 
 		fflagsEditor(window);
 		settingsWindow(window);
+		addAccountWindow(window);
 	}
 	ImGui::End();
 }

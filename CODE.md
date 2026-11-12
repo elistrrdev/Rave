@@ -34,33 +34,36 @@ Roblox client into its own folder and starts it from there.
 |   |-- Rave.vcxproj
 |   |-- rave.rc            icons (1 = logo-bg.ico, 2 = logo.ico), logo.png (RCDATA 3), version info
 |   |-- rave.manifest      supportedOS (Windows 10/11), merged with the asInvoker UAC manifest
-|   |-- version.hpp        single source of the version, name, publisher, public releases repo url + release API
+|   |-- version.hpp        single source of the version, name, publisher, public releases repo url
 |                          (shared with Installer: the url is the Apps and Features website/help link)
-|   |-- main.hpp           shared ImGui helpers, window size, fonts, tabs enum
-|   |-- main.cpp           WinMain, startup order, D3D11 device, message loop, WIC logo loader
-|   |-- ui.cpp             pages: Home, Launch, State, header (tabs, logo, close), FFlags editor and Settings popups,
-|                          accent tinting of the header logo
+|   |-- main.hpp           shared ImGui helpers, window size, fonts, Tab enum (Home, Accounts, Info)
+|   |-- main.cpp           WinMain, startup order, D3D11 device, message loop, WIC image loader (logo, avatars, QR)
+|   |-- ui.cpp             pages: Home, Accounts, Info, header (tabs, logo, close), FFlags editor, Settings and
+|                          Add Account popups, avatar and QR textures, accent tinting of the header logo
 |   |-- custom\            ImGui widgets
 |   |   |-- colors.hpp     color palette, setAccent() (Main + derived hover color), color helpers
 |   |   |-- custom.hpp     widget declarations, logType enum
-|   |   |-- misc.cpp       window begin, style, blur, rounded corners, child boxes, announcement, label/value rows
+|   |   |-- misc.cpp       window begin, style, blur, rounded corners, child boxes, label/value rows
 |   |   |-- button.cpp     buttons, choice buttons (segmented options) and accent swatches
 |   |   |-- tab.cpp        tab labels in the header
 |   |   |-- closebutton.cpp close X in the header (drawn with two lines, no icon font)
 |   |   |-- input.cpp      single line text input (not used on a page right now)
-|   |   |-- logs.cpp       thread safe log list shown on the Launch page (memory only, never written to disk)
+|   |   |-- logs.cpp       thread safe log list shown on the Home page (memory only, never written to disk)
 |   |-- core\              non UI logic
-|   |   |-- net.*          WinHTTP GET into memory with progress, internet check
-|   |   |-- json.*         small JSON parser (Roblox version API, GitHub release API, FFlags validation)
+|   |   |-- net.*          WinHTTP requests (any method, body, headers) into memory with progress, response header
+|                          and Set-Cookie lookup, automatic cookies disabled, internet check
+|   |   |-- json.*         small JSON parser + string quoting (Roblox APIs, FFlags validation, accounts.dat)
 |   |   |-- inflate.*      raw DEFLATE decoder (used by zip)
 |   |   |-- zip.*          zip reader/extractor with CRC32 check and path traversal guard
 |   |   |-- paths.*        %LOCALAPPDATA%\Rave, Versions folder, %TEMP%\rave-temp, folder helpers
 |   |   |-- system.*       admin check (crash report), Windows version, unelevated launch, process lookup, md5
 |   |   |-- roblox.*       latest version lookup, package download/verify/extract, launch, running check
-|   |   |-- launcher.*     background launch worker, Roblox watcher (start behavior, "closed" log), latest version state
+|   |   |-- launcher.*     background launch worker (signed in launch), Roblox watcher (start behavior, "closed" log),
+|                          latest version state
+|   |   |-- accounts.*     account manager: accounts.dat (DPAPI), Quick Login, cookie login, avatars, sign-in tickets
+|   |   |-- sysinfo.*      CPU, GPU, RAM, display and the HardwareID for the Info page
 |   |   |-- fflags.*       FFlags storage (fflags.json), validation, writing ClientAppSettings.json
 |   |   |-- settings.*     settings.json (start behavior, accent color) and the accent palette list
-|   |   |-- news.*         latest GitHub release for the Home page
 |   |   |-- report.*       crash handler (minidump + txt) and bug reports, both in %TEMP%\rave-temp
 |   |-- __ext\             third party: Dear ImGui 1.91.3 (with shadows), FreeType (win64 static lib), fonts.h (Montserrat Medium + SemiBold)
 |-- Installer\             Rave-Installer.exe
@@ -79,8 +82,9 @@ Roblox client into its own folder and starts it from there.
    No window, no message, no files. This is the "silent fail".
 3. Single instance mutex `Local\RaveSingleInstance`. A second start focuses the existing window and exits.
 4. `%LOCALAPPDATA%\Rave` is created and `settings.json` is loaded.
-5. Window, D3D11, ImGui, then `ui::BeforeLoop()` applies the accent, loads fonts and the logo, starts the launcher
-   monitor and the news request.
+5. Window, D3D11, ImGui, then `ui::BeforeLoop()` applies the accent, loads fonts and the logo, reads the system
+   specs on a background thread, loads `accounts.dat` (and refreshes names, logins and avatars in the background)
+   and starts the launcher monitor.
 6. While the window is hidden or minimized the loop only handles messages and sleeps 50 ms (no rendering).
 
 ## Folders and files Rave creates
@@ -89,35 +93,106 @@ Roblox client into its own folder and starts it from there.
 - `%LOCALAPPDATA%\Rave\fflags.json` - the FFlags from the editor, exactly as typed (a JSON object).
 - `%LOCALAPPDATA%\Rave\settings.json` - `{ "startBehavior": "keep_open" | "minimize" | "hide", "accent": "#rrggbb" }`.
   Missing or broken values fall back to keep_open and #6addbb.
+- `%LOCALAPPDATA%\Rave\accounts.dat` - only when an account was added. The added Roblox accounts and the selected one,
+  as JSON (`{ "selected": "<id>", "accounts": [ { "id", "name", "displayName", "quick", "expired", "cookie" } ] }`)
+  encrypted with DPAPI (CryptProtectData, current Windows user, entropy "Rave accounts v1"). Written to
+  `accounts.dat.tmp` first and then moved over the old file. Never readable as plain text on disk.
 - `%LOCALAPPDATA%\Rave\Versions\version-<hash>\` - one Roblox client. A version counts as installed only when
   `AppSettings.xml` and `RobloxPlayerBeta.exe` exist (AppSettings.xml is written last).
 - `%LOCALAPPDATA%\Rave\Versions\version-<hash>\ClientSettings\ClientAppSettings.json` - the FFlags for Roblox.
 - `%TEMP%\rave-temp` - only created when a crash report or bug report is written:
   - `rave-crash-<date>-<time>.dmp/.txt` from the crash handler, then a message box + the folder opens.
-  - `rave-bug-<date>-<time>.txt` when a Roblox version check, install or launch fails (logged on the Launch page).
-- No log files are ever written. The Launch page log lives in memory only.
+  - `rave-bug-<date>-<time>.txt` when a Roblox version check, install or launch fails (logged on the Home page).
+    A failed sign-in is only logged, never written to a bug report.
+- No log files are ever written. The Home page log lives in memory only. Cookies and tickets are never logged.
 
 ## UI (ui.cpp)
 
 - No animations at all: no intro titles, no arrow button, no page fade, no hover fades, no log fade in.
   Clicking a tab switches the page in the same frame. Widgets draw their hover/active colors directly.
-- Header: tabs Home / Launch / State at (20, 40), the logo centered at the top (30 px high, made from
+- Header: tabs Home / Accounts / Info at (20, 40), the logo centered at the top (30 px high, made from
   logo.png: cropped to its visible pixels and scaled with WIC high quality cubic), close icon on the right.
+  Rave opens on Home.
 - Every page is one box at (20, 100), size (window width - 40) x 347.
-- **Home**: "WHAT'S NEW?" box. `news::fetchAsync()` reads
-  `https://api.github.com/repos/elistrrdev/Rave/releases/latest`, the public releases-only repo (the source lives in
-  the private `elistrrdev/Rave-SRC`, which the API can not read without a token). A release shows its name, date and body
-  (simple markdown is stripped, em/en dashes become `-`, long text wraps and scrolls with the mouse wheel).
-  No release (404) or no answer shows "no news" centered in the box.
-- **Launch**: log box + buttons.
+- **Home** (was the Launch page): log box + buttons.
   - The log keeps the last 8 lines (font 17 px, spacing 7 px, so the last line with g/y/p fits the 190 px box).
-  - LAUNCH ROBLOX: check latest version -> install/update if needed -> write FFlags -> start Roblox.
-    The button label shows the current step and the install percentage.
+  - LAUNCH ROBLOX: check latest version -> install/update if needed -> write FFlags -> sign in (if an account is
+    selected) -> start Roblox. The button label shows the current step and the install percentage.
   - FFLAGS EDITOR: opens the FFlags editor popup (see below).
   - SETTINGS: opens the Settings popup (see below).
-- **State**: three label/value rows (label in Main, value in Lwhite): Rave Version, Windows, Latest Roblox.
-  The latest Roblox version is fetched on start and every 10 minutes by the launcher monitor.
+- **Accounts**: the account list (scrolls with the mouse wheel) and two buttons at the bottom.
+  - Each row (58 px): round avatar (40 px, the first letter of the name while it loads), display name, `@name`
+    (in red with "login expired, add it again" when Roblox no longer accepts the login), USE / IN USE and REMOVE.
+    The selected row is tinted with the accent and has an accent border.
+  - REMOVE asks once: the button turns into SURE? for 3 seconds, a second click removes the account.
+  - Empty list: "No accounts added yet" and a short hint, centered.
+  - ADD ACCOUNT opens the Add Account popup. USE ROBLOX'S OWN LOGIN (filled when no account is selected) clears
+    the selection, then LAUNCH ROBLOX starts Roblox exactly like before (`--app`, Roblox uses its own saved login).
+- **Info**: label/value rows (label in Main, value in Lwhite): Rave Version, Windows, Latest Roblox, CPU, GPU, RAM,
+  Display, HardwareID (always the last row). The latest Roblox version is fetched on start and every 10 minutes by
+  the launcher monitor. Hovering the HardwareID shows a hand cursor and "click to copy", a click copies it and shows
+  "copied" for 2 seconds.
 - Bottom right: "Rave V0.1" (from version.hpp).
+
+## Add Account popup (ui.cpp namespace `addacc` + core/accounts.cpp)
+
+- Same popup look as the others (520 x 360). Title ADD ACCOUNT, two method buttons QUICK LOGIN / COOKIE, CLOSE at
+  the bottom. ESC and CLOSE close it. It closes by itself as soon as an account was added or updated
+  (`accounts::addedCount()` changed), the new account is then selected and "Account added: ..." is logged.
+- QUICK LOGIN (opens by default): Rave asks Roblox for a Quick Log In code and shows the QR code (330 px PNG from
+  Roblox, 33 modules, drawn at 132 px with nearest neighbor scaling so it stays sharp, on a white 156 px box) and
+  the code. The user enters the code on a signed in device (Roblox Settings > Quick Log In) or scans the QR code,
+  then confirms there. The status line shows waiting / "Confirm the login for @name" / signing in / errors.
+  Codes run out after about 2 minutes, a new one is fetched automatically (5 times), then NEW CODE appears in the
+  QR box.
+- COOKIE: a masked text box for the `.ROBLOSECURITY` cookie, PASTE (clipboard) and ADD ACCOUNT, a red warning to
+  never share the cookie. Quotes, spaces and a leading `.ROBLOSECURITY=` are removed. Only printable ASCII without
+  `;` and `,` is accepted (so a cookie can never inject extra HTTP headers).
+- The cookie text buffer is wiped with SecureZeroMemory when the popup closes or the method changes.
+
+## Accounts (core/accounts.cpp)
+
+- Everything that talks to Roblox goes through `rbx()`: it adds `Referer: https://www.roblox.com/`, JSON headers,
+  the `Cookie: .ROBLOSECURITY=...` header for that one account and the `x-csrf-token`. A 403 with a new
+  `x-csrf-token` header is retried once with that token. WinHTTP never stores cookies (net.cpp disables it), so
+  accounts can not leak into each other.
+- When Roblox sends a new `.ROBLOSECURITY` (cookie rotation) Rave saves it.
+- Quick Login (`runQuick`, one worker per attempt, `quickGen` cancels old ones):
+  1. `POST https://apis.roblox.com/auth-token-service/v1/login/create` `{}` -> `code`, `privateKey`.
+  2. `GET .../v1/login/qr-code-image?key=<privateKey>&code=<code>` -> QR PNG.
+  3. Every 2.5 s `POST .../v1/login/status` `{code, privateKey}` -> `Created` / `UserLinked` (`accountName`) /
+     `Validated` / `Cancelled`. After 115 s or a 400/404 the code counts as expired.
+  4. `POST https://auth.roblox.com/v2/login` `{"ctype":"AuthToken","cvalue":code,"password":privateKey}` -> the
+     `Set-Cookie: .ROBLOSECURITY`. A `rblx-challenge-id` header means Roblox wants a captcha or similar check;
+     Rave does not try to solve it and tells the user to try later or use COOKIE.
+  5. `GET https://users.roblox.com/v1/users/authenticated` -> id, name, displayName. Stored with `quick = true`.
+- Cookie login: the same `users/authenticated` check, 401 = "not valid or has expired". Stored with `quick = false`.
+- Adding an account that is already in the list updates it (new cookie, names) instead of adding it twice.
+  A replaced Quick Login session is signed out at Roblox.
+- On start every account is checked once with `users/authenticated` (names updated, `expired` set on 401), then
+  the avatars are loaded: `https://thumbnails.roblox.com/v1/users/avatar-headshot?size=150x150&format=Png&userIds=...`,
+  the images only from `https://*.rbxcdn.com`. Avatars live in memory only.
+- REMOVE: the account leaves accounts.dat. Quick Login sessions were created by Rave, so Rave also calls
+  `POST https://auth.roblox.com/v2/logout` for them. Cookie accounts are only removed from Rave (logging out would
+  also end the browser session the cookie came from).
+- Signed in launch (`launcher.cpp`, when an account is selected):
+  `POST https://auth.roblox.com/v1/authentication-ticket` -> header `rbx-authentication-ticket` (one-time ticket),
+  then `RobloxPlayerBeta.exe roblox-player:1+launchmode:app+gameinfo:<ticket>+launchtime:<unix ms>+browsertrackerid:<random>+robloxLocale:<xx_yy>+gameLocale:<xx_yy>+channel:+LaunchExp:InApp`
+  (the same launch string the Roblox website uses, locale from the Windows user locale). A 401 marks the account as
+  expired and the launch stops with "Sign-in failed: ...". The log says "Launching Roblox as Name (@name)".
+
+## Info page data (core/sysinfo.cpp)
+
+- Read once (`std::call_once`), started on a background thread at startup.
+- CPU: `ProcessorNameString` from `HKLM\HARDWARE\DESCRIPTION\System\CentralProcessor\0`, cores from
+  `GetLogicalProcessorInformationEx(RelationProcessorCore)`, threads from `GetActiveProcessorCount`.
+- GPU: DXGI, the hardware adapter with the most dedicated video memory, plus its VRAM.
+- RAM: `GetPhysicallyInstalledSystemMemory` (fallback `GlobalMemoryStatusEx`).
+- Display: primary monitor resolution and refresh rate (`EnumDisplaySettingsW`), plus the monitor count if more than one.
+- HardwareID: SHA-256 of `rave-hwid|<MachineGuid>|<SMBIOS system UUID>|<CPU name>`, first 16 bytes as uppercase hex in
+  4 groups (`XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX`). MachineGuid is `HKLM\SOFTWARE\Microsoft\Cryptography`, the UUID comes
+  from the SMBIOS type 1 table (`GetSystemFirmwareTable('RSMB')`). Stable across restarts and Rave updates, it changes
+  with a Windows reinstall or a new mainboard/CPU. It is only shown, never sent anywhere.
 
 ## FFlags editor (ui.cpp namespace `editor` + core/fflags.cpp)
 
@@ -254,8 +329,9 @@ Roblox client into its own folder and starts it from there.
 - `LICENSE` is the Rave End User License Agreement and Terms of Use: definitions, acceptance, ownership, license grant
   (personal, non-commercial), restrictions (no sharing, no reverse engineering, no modified builds, no cheats), administrator rights
   (Rave does not ask for them, only Setup and the uninstaller do), Roblox (not affiliated, official client
-  from Roblox servers, Roblox Terms of Use, FFlags at own risk), data and privacy (exact network hosts and local files of
-  V0.1), updates, test versions, feedback, support, termination, warranty disclaimer, liability, indemnity, laws,
+  from Roblox servers, Roblox Terms of Use, FFlags at own risk, 7.6 account manager), data and privacy (exact network
+  hosts and local files of V0.1, encrypted accounts.dat, crash dumps can hold account data, 8.5 Info page and
+  HardwareID stay local), updates, test versions, feedback, support, termination, warranty disclaimer, liability, indemnity, laws,
   consumer rights, governing law, third-party components, general terms, contact.
 - Appendix A lists every third-party part: Dear ImGui 1.91.3 (MIT, full text), stb_truetype / stb_rect_pack /
   stb_textedit (public domain or MIT), FreeType 2.12.1 (FreeType License credit line), Montserrat (SIL OFL 1.1, full
@@ -264,6 +340,7 @@ Roblox client into its own folder and starts it from there.
   The uninstaller removes LICENSE.txt again.
 - The text uses one line per paragraph so the installer text box can wrap it. Plain ASCII only.
 - When third-party material changes, Appendix A has to change in the same commit.
+- When Rave talks to a new host or stores new data, sections 8.2 / 8.3 have to change in the same commit.
 
 ## Admin rights
 

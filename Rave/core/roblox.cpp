@@ -334,7 +334,7 @@ void roblox::removeOldVersions(const std::string& keepGuid)
         paths::removeTree(dir);
 }
 
-bool roblox::launch(const std::string& guid, std::string& error)
+bool roblox::launch(const std::string& guid, const std::wstring& args, std::string& error)
 {
     std::wstring dir = versionDir(guid);
     if (!isComplete(dir))
@@ -342,7 +342,7 @@ bool roblox::launch(const std::string& guid, std::string& error)
         error = "Roblox is not installed";
         return false;
     }
-    if (!sys::launchUnelevated(dir + L"\\" + kPlayerExe, L"--app", dir))
+    if (!sys::launchUnelevated(dir + L"\\" + kPlayerExe, args, dir))
     {
         error = "could not start Roblox";
         return false;

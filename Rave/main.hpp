@@ -72,7 +72,7 @@ namespace gfx
         unsigned w = 0, h = 0;
     };
 
-    bool decodeImage(const void* data, size_t size, int targetHeight, Image& out);
+    bool decodeImage(const void* data, size_t size, int targetHeight, Image& out, bool crop = true, bool sharp = false);
     ID3D11ShaderResourceView* createTexture(ID3D11Device* dvc, const Image& img);
 }
 
@@ -105,11 +105,11 @@ namespace images {
     inline _V2 logoSize;
 }
 
-enum tabs
+enum class Tab
 {
-    home,
-    launch,
-    state
+    Home,
+    Accounts,
+    Info
 };
 
 inline std::string getLocalTime()

@@ -31,7 +31,6 @@ namespace misc
     auto renderMulticolorText(std::vector<std::string> texts, std::vector<ImFont*> fonts, std::vector<_V4> colors) noexcept -> void;
     auto child(const std::string& ID, _V2 size) noexcept -> void;
     auto child2(const std::string& ID, _V2 size) noexcept -> void;
-    auto announcement(const std::string& title, const std::string& description) noexcept -> void;
     auto row(const std::string& label, const std::string& value) noexcept -> void;
 }
 

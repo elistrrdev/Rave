@@ -23,4 +23,5 @@ namespace json
     };
 
     bool parse(const std::string& text, Value& out);
+    std::string quote(const std::string& text);
 }

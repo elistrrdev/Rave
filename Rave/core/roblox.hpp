@@ -17,6 +17,6 @@ namespace roblox
     std::wstring versionDir(const std::string& guid);
     bool install(const std::string& guid, const Progress& progress, std::string& error);
     void removeOldVersions(const std::string& keepGuid);
-    bool launch(const std::string& guid, std::string& error);
+    bool launch(const std::string& guid, const std::wstring& args, std::string& error);
     bool isRunning();
 }

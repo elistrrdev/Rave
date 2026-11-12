@@ -118,44 +118,6 @@ auto misc::row(const std::string& label, const std::string& value) noexcept -> v
     );
 }
 
-auto misc::announcement(const std::string& title, const std::string& description) noexcept -> void
-{
-    ImGuiWindow* window = GetCurrentWindow();
-
-    _V2 pos = window->DC.CursorPos;
-    float width = window->Size.x - GetCursorPosX() * 2;
-
-    PushFont(f.montM[1]);
-    _V2 body = CalcTextSize(description.c_str(), nullptr, false, width);
-    PopFont();
-
-    _V2 size = { width, std::max(77.f, 40 + body.y) };
-
-    ItemSize(size, 0);
-    ItemAdd({ pos, pos + size }, 0);
-    ItemHoverable({ pos, pos + size }, 0, 0);
-
-    PushFont(f.montM[2]);
-    window->DrawList->AddText(
-        pos,
-        _CO(colors::Main),
-        title.c_str()
-    );
-    PopFont();
-
-    PushFont(f.montM[1]);
-    window->DrawList->AddText(
-        GetFont(),
-        GetFontSize(),
-        pos + _V2(0, 40),
-        _CO(colors::Lwhite),
-        description.c_str(),
-        nullptr,
-        width
-    );
-    PopFont();
-}
-
 auto misc::child(const std::string& ID, _V2 size) noexcept -> void
 {
     ImGuiWindow* window = GetCurrentWindow();

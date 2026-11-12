@@ -168,7 +168,7 @@ void ui::RequestClose()
     PostMessageW(window::dx::hwnd, WM_CLOSE, 0, 0);
 }
 
-bool gfx::decodeImage(const void* data, size_t size, int targetHeight, Image& out)
+bool gfx::decodeImage(const void* data, size_t size, int targetHeight, Image& out, bool crop, bool sharp)
 {
     ComPtr<IWICImagingFactory> factory;
     if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory))))
@@ -201,7 +201,7 @@ bool gfx::decodeImage(const void* data, size_t size, int targetHeight, Image& ou
         return false;
 
     UINT x0 = w, y0 = h, x1 = 0, y1 = 0;
-    for (UINT y = 0; y < h; ++y)
+    for (UINT y = 0; crop && y < h; ++y)
         for (UINT x = 0; x < w; ++x)
             if (full[((size_t)y * w + x) * 4 + 3] > 16)
             {
@@ -228,7 +228,8 @@ bool gfx::decodeImage(const void* data, size_t size, int targetHeight, Image& ou
         return false;
 
     ComPtr<IWICBitmapScaler> scaler;
-    if (FAILED(factory->CreateBitmapScaler(&scaler)) || FAILED(scaler->Initialize(bitmap.Get(), tw, th, WICBitmapInterpolationModeHighQualityCubic)))
+    WICBitmapInterpolationMode mode = sharp ? WICBitmapInterpolationModeNearestNeighbor : WICBitmapInterpolationModeHighQualityCubic;
+    if (FAILED(factory->CreateBitmapScaler(&scaler)) || FAILED(scaler->Initialize(bitmap.Get(), tw, th, mode)))
     {
         if (!scaler || FAILED(scaler->Initialize(bitmap.Get(), tw, th, WICBitmapInterpolationModeFant)))
             return false;

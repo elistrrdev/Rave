@@ -265,6 +265,29 @@ const std::string& json::Value::str() const
     return string;
 }
 
+std::string json::quote(const std::string& text)
+{
+    static const char* hex = "0123456789abcdef";
+    std::string out = "\"";
+    for (unsigned char c : text)
+    {
+        if (c == '"') out += "\\\"";
+        else if (c == '\\') out += "\\\\";
+        else if (c == '\n') out += "\\n";
+        else if (c == '\r') out += "\\r";
+        else if (c == '\t') out += "\\t";
+        else if (c < 0x20)
+        {
+            out += "\\u00";
+            out += hex[c >> 4];
+            out += hex[c & 15];
+        }
+        else out += (char)c;
+    }
+    out += '"';
+    return out;
+}
+
 bool json::parse(const std::string& text, Value& out)
 {
     out = {};

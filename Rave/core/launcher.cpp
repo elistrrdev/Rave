@@ -1,12 +1,16 @@
 #include "launcher.hpp"
+#include "accounts.hpp"
 #include "fflags.hpp"
 #include "report.hpp"
 #include "roblox.hpp"
 #include "settings.hpp"
+#include "system.hpp"
 #include <windows.h>
 #include <objbase.h>
 #include <atomic>
+#include <cwctype>
 #include <mutex>
+#include <random>
 #include <thread>
 
 namespace
@@ -112,6 +116,43 @@ namespace
             windowAction(launcher::WindowRestore);
     }
 
+    std::wstring robloxLocale()
+    {
+        wchar_t name[LOCALE_NAME_MAX_LENGTH]{};
+        std::wstring locale = GetUserDefaultLocaleName(name, LOCALE_NAME_MAX_LENGTH) > 0 ? name : L"en-US";
+        std::wstring out;
+        for (wchar_t c : locale)
+        {
+            if (c == L'-')
+                out += L'_';
+            else if (iswalpha(c))
+                out += (wchar_t)towlower(c);
+            else
+                break;
+        }
+        return out.size() >= 2 ? out : L"en_us";
+    }
+
+    std::wstring signedInArgs(const std::string& ticket)
+    {
+        FILETIME ft;
+        GetSystemTimeAsFileTime(&ft);
+        ULARGE_INTEGER now{};
+        now.LowPart = ft.dwLowDateTime;
+        now.HighPart = ft.dwHighDateTime;
+        uint64_t unixMs = (now.QuadPart - 116444736000000000ull) / 10000ull;
+
+        std::random_device rd;
+        uint64_t tracker = 100000000000ull + ((((uint64_t)rd() << 32) | rd()) % 900000000000ull);
+
+        std::wstring locale = robloxLocale();
+        return L"roblox-player:1+launchmode:app+gameinfo:" + sys::widen(ticket) +
+            L"+launchtime:" + std::to_wstring(unixMs) +
+            L"+browsertrackerid:" + std::to_wstring(tracker) +
+            L"+robloxLocale:" + locale + L"+gameLocale:" + locale +
+            L"+channel:+LaunchExp:InApp";
+    }
+
     void runLaunch()
     {
         CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
@@ -155,8 +196,28 @@ namespace
         if (!fflags::apply(roblox::versionDir(latest.guid)))
             log("Could not apply the FFlags", launcher::LogLevel::Warn);
 
-        log("Launching Roblox", launcher::LogLevel::Info);
-        if (!roblox::launch(latest.guid, error))
+        std::wstring args = L"--app";
+        uint64_t accountId = accounts::selected();
+        if (accountId)
+        {
+            accounts::Account who;
+            std::string ticket;
+            if (!accounts::ticket(accountId, ticket, who, error))
+            {
+                log("Sign-in failed: " + error, launcher::LogLevel::Error);
+                currentTask = launcher::Task::Idle;
+                CoUninitialize();
+                return;
+            }
+            args = signedInArgs(ticket);
+            log("Launching Roblox as " + accounts::label(who), launcher::LogLevel::Info);
+        }
+        else
+        {
+            log("Launching Roblox", launcher::LogLevel::Info);
+        }
+
+        if (!roblox::launch(latest.guid, args, error))
         {
             failWithReport("Roblox launch failed", error);
             currentTask = launcher::Task::Idle;
