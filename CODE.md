@@ -34,7 +34,8 @@ Roblox client into its own folder and starts it from there. The built-in antiche
 |   |-- Rave.vcxproj
 |   |-- rave.rc            icons (1 = logo-bg.ico, 2 = logo.ico), logo.png (RCDATA 3), version info
 |   |-- rave.manifest      supportedOS (Windows 10/11), merged with the asInvoker UAC manifest
-|   |-- version.hpp        single source of the version, name, publisher, repo urls (shared with Installer)
+|   |-- version.hpp        single source of the version, name, publisher, public releases repo url + release API
+|                          (shared with Installer: the url is the Apps and Features website/help link)
 |   |-- main.hpp           shared ImGui helpers, window size, fonts, tabs enum
 |   |-- main.cpp           WinMain, startup order, D3D11 device, message loop, WIC logo loader
 |   |-- ui.cpp             pages: Home, Launch, State, header (tabs, logo, close), FFlags editor and Settings popups,
@@ -108,7 +109,8 @@ Roblox client into its own folder and starts it from there. The built-in antiche
   logo.png: cropped to its visible pixels and scaled with WIC high quality cubic), close icon on the right.
 - Every page is one box at (20, 100), size (window width - 40) x 347.
 - **Home**: "WHAT'S NEW?" box. `news::fetchAsync()` reads
-  `https://api.github.com/repos/elistrrdev/Rave-SRC/releases/latest`. A release shows its name, date and body
+  `https://api.github.com/repos/elistrrdev/Rave/releases/latest`, the public releases-only repo (the source lives in
+  the private `elistrrdev/Rave-SRC`, which the API can not read without a token). A release shows its name, date and body
   (simple markdown is stripped, em/en dashes become `-`, long text wraps and scrolls with the mouse wheel).
   No release (404) or no answer shows "no news" centered in the box.
 - **Launch**: log box + buttons.

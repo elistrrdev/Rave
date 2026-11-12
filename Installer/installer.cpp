@@ -1245,8 +1245,8 @@ namespace
             regWrite(key, L"InstallLocation", installDir);
             regWrite(key, L"UninstallString", L"\"" + uninstaller + L"\"");
             regWrite(key, L"QuietUninstallString", L"\"" + uninstaller + L"\"");
-            regWrite(key, L"URLInfoAbout", RAVE_REPO_URL);
-            regWrite(key, L"HelpLink", RAVE_REPO_URL);
+            regWrite(key, L"URLInfoAbout", RAVE_PUBLIC_URL);
+            regWrite(key, L"HelpLink", RAVE_PUBLIC_URL);
             regWrite(key, L"EstimatedSize", (DWORD)((payload.size * 2ull) / 1024));
             regWrite(key, L"NoModify", 1);
             regWrite(key, L"NoRepair", 1);

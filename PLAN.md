@@ -32,6 +32,8 @@ Done in code:
 - [x] Uninstaller deletes its %TEMP% copy right after it finished
 - [x] build.bat, .gitignore, CODE.md, PLAN.md
 - [x] Pushed to https://github.com/elistrrdev/Rave-SRC (main), repo is private (backup only)
+- [x] Public releases-only repo https://github.com/elistrrdev/Rave: Home news reads its latest release,
+      Apps and Features links point to it
 - [x] Closed source, all rights reserved: `LICENSE` is now the Rave End User License Agreement and Terms of Use with
       Appendix A (third-party notices), shown in the installer and installed as LICENSE.txt
 - [x] Icon font with unknown license removed, close X is drawn directly
@@ -46,8 +48,7 @@ Waiting for the user:
       and that %TEMP% has no Rave-Uninstall-*.exe a few seconds after uninstalling
 - [ ] Test on Windows 10 if possible (corners, blur)
 - [ ] Read the new License Agreement in the installer (and maybe have it checked by a lawyer before V0.2 goes public)
-- [ ] Decide where V0.2 releases will be published, since the repo is private now (the Home news box reads the
-      GitHub releases API, which does not work for a private repo without a token)
+- [ ] Fill the public releases repo (README.md, LICENSE with the Rave terms) and publish the first release there
 
 ## V0.2
 
