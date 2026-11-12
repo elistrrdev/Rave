@@ -2,6 +2,8 @@
 #include "core/net.hpp"
 #include "core/paths.hpp"
 #include "core/report.hpp"
+#include "core/launcher.hpp"
+#include "core/settings.hpp"
 #include "core/system.hpp"
 #include <wincodec.h>
 #include <wrl/client.h>
@@ -28,6 +30,8 @@ static bool focusExistingInstance()
     HWND existing = FindWindowW(kWindowClass, nullptr);
     if (!existing)
         return false;
+    if (!IsWindowVisible(existing))
+        ShowWindow(existing, SW_SHOW);
     if (IsIconic(existing))
         ShowWindow(existing, SW_RESTORE);
     SetForegroundWindow(existing);
@@ -62,6 +66,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
 
     paths::localData();
+    settings::load();
 
     WNDCLASSEXW wc = { sizeof(wc), CS_CLASSDC, WndProc, 0L, 0L, hInstance, nullptr, nullptr, nullptr, nullptr, kWindowClass, nullptr };
     wc.hIcon = (HICON)LoadImageW(hInstance, MAKEINTRESOURCEW(2), IMAGE_ICON, GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON), LR_DEFAULTCOLOR);
@@ -120,6 +125,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         if (done)
             break;
 
+        if (!IsWindowVisible(window::dx::hwnd) || IsIconic(window::dx::hwnd))
+        {
+            ::Sleep(50);
+            continue;
+        }
+
         if (g_SwapChainOccluded && g_pSwapChain->Present(0, DXGI_PRESENT_TEST) == DXGI_STATUS_OCCLUDED)
         {
             ::Sleep(10);
@@ -168,37 +179,37 @@ void ui::RequestClose()
     PostMessageW(window::dx::hwnd, WM_CLOSE, 0, 0);
 }
 
-ID3D11ShaderResourceView* gfx::loadImage(ID3D11Device* dvc, const void* data, size_t size, int targetHeight, _V2* outSize)
+bool gfx::decodeImage(const void* data, size_t size, int targetHeight, Image& out)
 {
     ComPtr<IWICImagingFactory> factory;
     if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory))))
-        return nullptr;
+        return false;
 
     ComPtr<IWICStream> stream;
     if (FAILED(factory->CreateStream(&stream)) || FAILED(stream->InitializeFromMemory((BYTE*)data, (DWORD)size)))
-        return nullptr;
+        return false;
 
     ComPtr<IWICBitmapDecoder> decoder;
     if (FAILED(factory->CreateDecoderFromStream(stream.Get(), nullptr, WICDecodeMetadataCacheOnLoad, &decoder)))
-        return nullptr;
+        return false;
 
     ComPtr<IWICBitmapFrameDecode> frame;
     if (FAILED(decoder->GetFrame(0, &frame)))
-        return nullptr;
+        return false;
 
     ComPtr<IWICFormatConverter> converter;
     if (FAILED(factory->CreateFormatConverter(&converter)) ||
         FAILED(converter->Initialize(frame.Get(), GUID_WICPixelFormat32bppPRGBA, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom)))
-        return nullptr;
+        return false;
 
     UINT w = 0, h = 0;
     converter->GetSize(&w, &h);
     if (!w || !h)
-        return nullptr;
+        return false;
 
     std::vector<BYTE> full((size_t)w * h * 4);
     if (FAILED(converter->CopyPixels(nullptr, w * 4, (UINT)full.size(), full.data())))
-        return nullptr;
+        return false;
 
     UINT x0 = w, y0 = h, x1 = 0, y1 = 0;
     for (UINT y = 0; y < h; ++y)
@@ -225,18 +236,18 @@ ID3D11ShaderResourceView* gfx::loadImage(ID3D11Device* dvc, const void* data, si
 
     ComPtr<IWICBitmap> bitmap;
     if (FAILED(factory->CreateBitmapFromMemory(cw, ch, GUID_WICPixelFormat32bppPRGBA, cw * 4, (UINT)cropped.size(), cropped.data(), &bitmap)))
-        return nullptr;
+        return false;
 
     ComPtr<IWICBitmapScaler> scaler;
     if (FAILED(factory->CreateBitmapScaler(&scaler)) || FAILED(scaler->Initialize(bitmap.Get(), tw, th, WICBitmapInterpolationModeHighQualityCubic)))
     {
         if (!scaler || FAILED(scaler->Initialize(bitmap.Get(), tw, th, WICBitmapInterpolationModeFant)))
-            return nullptr;
+            return false;
     }
 
     std::vector<BYTE> pixels((size_t)tw * th * 4);
     if (FAILED(scaler->CopyPixels(nullptr, tw * 4, (UINT)pixels.size(), pixels.data())))
-        return nullptr;
+        return false;
 
     for (size_t i = 0; i < pixels.size(); i += 4)
     {
@@ -247,9 +258,20 @@ ID3D11ShaderResourceView* gfx::loadImage(ID3D11Device* dvc, const void* data, si
             pixels[i + k] = (BYTE)std::min(255, (pixels[i + k] * 255 + a / 2) / a);
     }
 
+    out.pixels = std::move(pixels);
+    out.w = tw;
+    out.h = th;
+    return true;
+}
+
+ID3D11ShaderResourceView* gfx::createTexture(ID3D11Device* dvc, const Image& img)
+{
+    if (!dvc || img.pixels.empty())
+        return nullptr;
+
     D3D11_TEXTURE2D_DESC desc{};
-    desc.Width = tw;
-    desc.Height = th;
+    desc.Width = img.w;
+    desc.Height = img.h;
     desc.MipLevels = 1;
     desc.ArraySize = 1;
     desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -258,8 +280,8 @@ ID3D11ShaderResourceView* gfx::loadImage(ID3D11Device* dvc, const void* data, si
     desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
 
     D3D11_SUBRESOURCE_DATA sub{};
-    sub.pSysMem = pixels.data();
-    sub.SysMemPitch = tw * 4;
+    sub.pSysMem = img.pixels.data();
+    sub.SysMemPitch = img.w * 4;
 
     ComPtr<ID3D11Texture2D> texture;
     if (FAILED(dvc->CreateTexture2D(&desc, &sub, &texture)))
@@ -272,8 +294,6 @@ ID3D11ShaderResourceView* gfx::loadImage(ID3D11Device* dvc, const void* data, si
 
     ID3D11ShaderResourceView* view = nullptr;
     dvc->CreateShaderResourceView(texture.Get(), &srv, &view);
-    if (view && outSize)
-        *outSize = _V2((float)tw, (float)th);
     return view;
 }
 
@@ -348,6 +368,19 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
         if ((wParam & 0xfff0) == SC_KEYMENU)
             return 0;
         break;
+    case launcher::WM_RAVE_WINDOW:
+        if (wParam == launcher::WindowMinimize)
+            ShowWindow(hWnd, SW_MINIMIZE);
+        else if (wParam == launcher::WindowHide)
+            ShowWindow(hWnd, SW_HIDE);
+        else if (wParam == launcher::WindowRestore)
+        {
+            ShowWindow(hWnd, SW_SHOW);
+            if (IsIconic(hWnd))
+                ShowWindow(hWnd, SW_RESTORE);
+            SetForegroundWindow(hWnd);
+        }
+        return 0;
     case WM_DESTROY:
         ::PostQuitMessage(0);
         return 0;

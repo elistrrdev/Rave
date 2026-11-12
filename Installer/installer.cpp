@@ -83,6 +83,8 @@ namespace
 
     int S(int v) { return MulDiv(v, dpi, 96); }
 
+    int message(HWND owner, const std::wstring& body, const wchar_t* caption, UINT type);
+
     struct Resource
     {
         const void* data = nullptr;
@@ -234,7 +236,7 @@ namespace
     {
         while (!raveProcesses().empty())
         {
-            int answer = MessageBoxW(owner, L"Rave is currently running.\n\nClick OK to close Rave and continue, or Cancel to stop.", kTitle, MB_OKCANCEL | MB_ICONWARNING);
+            int answer = message(owner, L"Rave is currently running.\n\nClick OK to close Rave and continue, or Cancel to stop.", kTitle, MB_OKCANCEL | MB_ICONWARNING);
             if (answer != IDOK)
                 return false;
             for (DWORD pid : raveProcesses())
@@ -562,6 +564,237 @@ namespace
         return { S(x), S(y), S(x + w), S(y + h) };
     }
 
+    const wchar_t* kMessageClass = L"RaveSetupMessage";
+
+    struct MessageState
+    {
+        std::wstring body;
+        HICON icon = nullptr;
+        RECT textRect{};
+        int band = 0;
+        int defaultId = IDOK;
+        int cancelId = IDOK;
+        int result = 0;
+        bool done = false;
+        std::vector<HWND> buttons;
+    };
+
+    void paintMessage(HWND hwnd, HDC dc)
+    {
+        MessageState* st = (MessageState*)GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+        RECT rc;
+        GetClientRect(hwnd, &rc);
+        fill(dc, rc, theme.content);
+        if (!st)
+            return;
+        fill(dc, { 0, 0, rc.right, rc.bottom - st->band }, theme.panel);
+        hline(dc, 0, rc.right, rc.bottom - st->band, theme.line);
+        if (st->icon)
+            DrawIconEx(dc, S(24), S(24), st->icon, S(32), S(32), 0, nullptr, DI_NORMAL);
+        text(dc, bodyFont, theme.text, st->textRect, st->body, DT_WORDBREAK);
+    }
+
+    LRESULT CALLBACK messageProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
+    {
+        MessageState* st = (MessageState*)GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+        switch (msg)
+        {
+        case WM_ERASEBKGND:
+            return 1;
+        case WM_PAINT:
+        {
+            PAINTSTRUCT ps;
+            HDC target = BeginPaint(hwnd, &ps);
+            RECT rc;
+            GetClientRect(hwnd, &rc);
+            HDC dc = CreateCompatibleDC(target);
+            HBITMAP bmp = CreateCompatibleBitmap(target, rc.right, rc.bottom);
+            HGDIOBJ old = SelectObject(dc, bmp);
+            paintMessage(hwnd, dc);
+            BitBlt(target, 0, 0, rc.right, rc.bottom, dc, 0, 0, SRCCOPY);
+            SelectObject(dc, old);
+            DeleteObject(bmp);
+            DeleteDC(dc);
+            EndPaint(hwnd, &ps);
+            return 0;
+        }
+        case WM_PRINTCLIENT:
+            paintMessage(hwnd, (HDC)wp);
+            return 0;
+        case WM_CTLCOLORBTN:
+            return (LRESULT)theme.contentBrush;
+        case DM_GETDEFID:
+            return st ? MAKELRESULT(st->defaultId, DC_HASDEFID) : 0;
+        case WM_COMMAND:
+            if (st && HIWORD(wp) == BN_CLICKED)
+            {
+                int id = LOWORD(wp);
+                if (id == IDCANCEL)
+                    id = st->cancelId;
+                st->result = id;
+                st->done = true;
+            }
+            return 0;
+        case WM_CLOSE:
+            if (st)
+            {
+                st->result = st->cancelId;
+                st->done = true;
+            }
+            return 0;
+        }
+        return DefWindowProcW(hwnd, msg, wp, lp);
+    }
+
+    int message(HWND owner, const std::wstring& body, const wchar_t* caption, UINT type)
+    {
+        static bool registered = false;
+        if (!registered)
+        {
+            WNDCLASSEXW wc{ sizeof(wc) };
+            wc.lpfnWndProc = messageProc;
+            wc.hInstance = instance;
+            wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+            wc.lpszClassName = kMessageClass;
+            RegisterClassExW(&wc);
+            registered = true;
+        }
+
+        MessageState st;
+        st.body = body;
+
+        struct Button { int id; const wchar_t* label; };
+        std::vector<Button> buttons;
+        switch (type & MB_TYPEMASK)
+        {
+        case MB_YESNO:
+            buttons = { { IDYES, L"&Yes" }, { IDNO, L"&No" } };
+            st.cancelId = IDNO;
+            break;
+        case MB_OKCANCEL:
+            buttons = { { IDOK, L"OK" }, { IDCANCEL, L"Cancel" } };
+            st.cancelId = IDCANCEL;
+            break;
+        default:
+            buttons = { { IDOK, L"OK" } };
+            st.cancelId = IDOK;
+            break;
+        }
+        int defIndex = ((type & MB_DEFMASK) == MB_DEFBUTTON2 && buttons.size() > 1) ? 1 : 0;
+        st.defaultId = buttons[defIndex].id;
+
+        LPCWSTR iconId = nullptr;
+        UINT sound = MB_OK;
+        switch (type & MB_ICONMASK)
+        {
+        case MB_ICONQUESTION: iconId = IDI_QUESTION; sound = MB_ICONQUESTION; break;
+        case MB_ICONWARNING: iconId = IDI_WARNING; sound = MB_ICONWARNING; break;
+        case MB_ICONERROR: iconId = IDI_ERROR; sound = MB_ICONERROR; break;
+        case MB_ICONINFORMATION: iconId = IDI_INFORMATION; sound = MB_ICONINFORMATION; break;
+        }
+        if (iconId)
+            LoadIconWithScaleDown(nullptr, iconId, S(32), S(32), &st.icon);
+
+        HDC screen = GetDC(nullptr);
+        HGDIOBJ oldFont = SelectObject(screen, bodyFont);
+        RECT measure{ 0, 0, S(380), 0 };
+        DrawTextW(screen, body.c_str(), (int)body.size(), &measure, DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX);
+        SelectObject(screen, oldFont);
+        ReleaseDC(nullptr, screen);
+
+        int textX = st.icon ? S(24 + 32 + 14) : S(24);
+        int textW = measure.right - measure.left;
+        int textH = measure.bottom - measure.top;
+        int top = S(24);
+        int contentH = std::max(textH, st.icon ? S(32) : 0);
+        int textY = top + (contentH - textH) / 2;
+
+        int bw = S(88), bh = S(26), gap = S(8), margin = S(12);
+        int buttonsW = (int)buttons.size() * bw + ((int)buttons.size() - 1) * gap;
+        st.band = S(50);
+        int clientW = std::max(textX + textW + S(24), buttonsW + margin * 2);
+        clientW = std::max(clientW, S(300));
+        int clientH = top + contentH + S(24) + st.band;
+        st.textRect = { textX, textY, textX + textW + S(2), textY + textH };
+
+        DWORD style = WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_CLIPCHILDREN;
+        DWORD exStyle = WS_EX_DLGMODALFRAME | WS_EX_CONTROLPARENT | (owner ? 0 : WS_EX_TOPMOST);
+        RECT wr{ 0, 0, clientW, clientH };
+        AdjustWindowRectEx(&wr, style, FALSE, exStyle);
+        int w = wr.right - wr.left, h = wr.bottom - wr.top;
+
+        RECT area{};
+        if (owner && IsWindow(owner))
+            GetWindowRect(owner, &area);
+        else
+            SystemParametersInfoW(SPI_GETWORKAREA, 0, &area, 0);
+        int x = area.left + (area.right - area.left - w) / 2;
+        int y = area.top + (area.bottom - area.top - h) / 2;
+
+        HWND hwnd = CreateWindowExW(exStyle, kMessageClass, caption, style, x, y, w, h, owner, nullptr, instance, nullptr);
+        if (!hwnd)
+            return MessageBoxW(owner, body.c_str(), caption, type);
+        SetWindowLongPtrW(hwnd, GWLP_USERDATA, (LONG_PTR)&st);
+        SendMessageW(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)appIconSmall);
+
+        if (allowDarkModeForWindow)
+            allowDarkModeForWindow(hwnd, theme.dark);
+        BOOL dark = theme.dark ? TRUE : FALSE;
+        if (FAILED(DwmSetWindowAttribute(hwnd, 20, &dark, sizeof(dark))))
+            DwmSetWindowAttribute(hwnd, 19, &dark, sizeof(dark));
+
+        int bx = clientW - margin - buttonsW;
+        int by = clientH - st.band + (st.band - bh) / 2;
+        for (size_t i = 0; i < buttons.size(); ++i)
+        {
+            DWORD bstyle = WS_CHILD | WS_VISIBLE | WS_TABSTOP | ((int)i == defIndex ? BS_DEFPUSHBUTTON : BS_PUSHBUTTON);
+            HWND b = CreateWindowExW(0, L"BUTTON", buttons[i].label, bstyle, bx + (int)i * (bw + gap), by, bw, bh, hwnd, (HMENU)(INT_PTR)buttons[i].id, instance, nullptr);
+            SendMessageW(b, WM_SETFONT, (WPARAM)bodyFont, TRUE);
+            themeControl(b, L"DarkMode_Explorer");
+            st.buttons.push_back(b);
+        }
+
+        bool ownerWasEnabled = owner && IsWindowEnabled(owner);
+        if (ownerWasEnabled)
+            EnableWindow(owner, FALSE);
+
+        MessageBeep(sound);
+        ShowWindow(hwnd, SW_SHOWNORMAL);
+        SetForegroundWindow(hwnd);
+        SetFocus(st.buttons[defIndex]);
+
+        MSG msg;
+        bool quit = false;
+        int quitCode = 0;
+        while (!st.done)
+        {
+            BOOL got = GetMessageW(&msg, nullptr, 0, 0);
+            if (got <= 0)
+            {
+                quit = got == 0;
+                quitCode = (int)msg.wParam;
+                st.result = st.cancelId;
+                break;
+            }
+            if (!IsDialogMessageW(hwnd, &msg))
+            {
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+        }
+
+        if (ownerWasEnabled)
+            EnableWindow(owner, TRUE);
+        DestroyWindow(hwnd);
+        if (owner && IsWindow(owner))
+            SetForegroundWindow(owner);
+        if (st.icon)
+            DestroyIcon(st.icon);
+        if (quit)
+            PostQuitMessage(quitCode);
+        return st.result;
+    }
+
     void paint(HDC dc)
     {
         RECT client;
@@ -620,6 +853,9 @@ namespace
             if (page == PageLicense)
             {
                 text(dc, bodyFont, theme.text, R(36, 70, 428, 18), L"Press Page Down to see the rest of the agreement.", DT_SINGLELINE);
+                RECT box = R(36, 90, 428, 192);
+                fill(dc, box, theme.field);
+                frame(dc, box, theme.trackBorder);
             }
             else if (page == PageLocation)
             {
@@ -865,8 +1101,16 @@ namespace
 
     void createControls()
     {
-        licenseEdit = makeControl(L"EDIT", L"", ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL | WS_TABSTOP, WS_EX_CLIENTEDGE, ID_LICENSE, R(36, 90, 428, 192));
+        RECT licenseFrame = R(36, 90, 428, 192);
+        InflateRect(&licenseFrame, -1, -1);
+        licenseEdit = makeControl(L"EDIT", L"", ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL | WS_TABSTOP, 0, ID_LICENSE, licenseFrame);
         SetWindowSubclass(licenseEdit, licenseSubclass, 1, 0);
+        RECT inner;
+        GetClientRect(licenseEdit, &inner);
+        inner.left += S(6);
+        inner.top += S(4);
+        inner.right -= S(4);
+        SendMessageW(licenseEdit, EM_SETRECTNP, 0, (LPARAM)&inner);
         acceptCheck = makeControl(kCheckClass, L"I accept the terms of the License Agreement", WS_TABSTOP, 0, ID_ACCEPT, R(36, 292, 428, 22));
 
         pathEdit = makeControl(L"EDIT", L"", ES_AUTOHSCROLL | WS_TABSTOP, WS_EX_CLIENTEDGE, ID_PATH, R(50, 154, 310, 24));
@@ -912,8 +1156,8 @@ namespace
 
         if (page == PageLicense)
         {
-            SetFocus(licenseEdit);
             SendMessageW(licenseEdit, EM_SETSEL, 0, 0);
+            SetFocus(acceptCheck);
         }
         else if (page == PageLocation)
             SetFocus(pathEdit);
@@ -1020,7 +1264,7 @@ namespace
             dir.pop_back();
         if (dir.size() < 3 || PathIsRelativeW(dir.c_str()) || dir.find_first_of(L"*?\"<>|") != std::wstring::npos || PathIsRootW(dir.c_str()))
         {
-            MessageBoxW(mainWindow, L"Please choose a valid folder to install Rave in.", kTitle, MB_OK | MB_ICONWARNING);
+            message(mainWindow, L"Please choose a valid folder to install Rave in.", kTitle, MB_OK | MB_ICONWARNING);
             return false;
         }
         installDir = dir;
@@ -1047,7 +1291,7 @@ namespace
             finish();
             return;
         }
-        if (failed || MessageBoxW(mainWindow, L"Are you sure you want to quit Rave Setup?", kTitle, MB_YESNO | MB_ICONQUESTION) == IDYES)
+        if (failed || message(mainWindow, L"Are you sure you want to quit Rave Setup?", kTitle, MB_YESNO | MB_ICONQUESTION) == IDYES)
             DestroyWindow(mainWindow);
     }
 
@@ -1180,7 +1424,7 @@ namespace
                 EnableWindow(cancelButton, TRUE);
                 SetWindowTextW(cancelButton, L"&Close");
                 InvalidateRect(hwnd, nullptr, FALSE);
-                MessageBoxW(hwnd, str->c_str(), kTitle, MB_OK | MB_ICONERROR);
+                message(hwnd, str->c_str(), kTitle, MB_OK | MB_ICONERROR);
             }
             delete str;
             return 0;
@@ -1215,7 +1459,7 @@ namespace
         titleFont = CreateFontW(-MulDiv(12, dpi, 72), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, lf.lfFaceName);
     }
 
-    int runInstaller()
+    void initUi()
     {
         HDC screen = GetDC(nullptr);
         dpi = GetDeviceCaps(screen, LOGPIXELSY);
@@ -1224,6 +1468,27 @@ namespace
         initDarkModeSupport();
         applyTheme();
         createFonts();
+    }
+
+    void deleteSelfSoon(const std::wstring& path)
+    {
+        wchar_t system[MAX_PATH]{};
+        GetSystemDirectoryW(system, MAX_PATH);
+        std::wstring cmdExe = std::wstring(system) + L"\\cmd.exe";
+        std::wstring cmd = L"\"" + cmdExe + L"\" /c ping 127.0.0.1 -n 3 >nul & del /f /q \"" + path + L"\"";
+        STARTUPINFOW si{};
+        si.cb = sizeof(si);
+        PROCESS_INFORMATION pi{};
+        if (CreateProcessW(cmdExe.c_str(), cmd.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, system, &si, &pi))
+        {
+            CloseHandle(pi.hThread);
+            CloseHandle(pi.hProcess);
+        }
+        MoveFileExW(path.c_str(), nullptr, MOVEFILE_DELAY_UNTIL_REBOOT);
+    }
+
+    int runInstaller()
+    {
         watermark = makeWatermark(S(kWatermark), S(kBand));
         headerIcon = (HICON)LoadImageW(instance, MAKEINTRESOURCEW(IDI_RAVE), IMAGE_ICON, S(49), S(49), 0);
 
@@ -1266,6 +1531,11 @@ namespace
         MSG msg;
         while (GetMessageW(&msg, nullptr, 0, 0) > 0)
         {
+            if (msg.message == WM_KEYDOWN && page == PageLicense && (msg.wParam == VK_NEXT || msg.wParam == VK_PRIOR) && GetFocus() != licenseEdit)
+            {
+                SendMessageW(licenseEdit, EM_SCROLL, msg.wParam == VK_NEXT ? SB_PAGEDOWN : SB_PAGEUP, 0);
+                continue;
+            }
             if (!IsDialogMessageW(mainWindow, &msg))
             {
                 TranslateMessage(&msg);
@@ -1283,7 +1553,7 @@ namespace
     int runUninstaller(const std::wstring& dir)
     {
         std::wstring exe = dir + L"\\Rave.exe";
-        if (MessageBoxW(nullptr, L"Are you sure you want to completely remove Rave and all of its components?", L"Rave Uninstall", MB_YESNO | MB_ICONQUESTION) != IDYES)
+        if (message(nullptr, L"Are you sure you want to completely remove Rave and all of its components?", L"Rave Uninstall", MB_YESNO | MB_ICONQUESTION) != IDYES)
             return 1;
 
         if (!closeRave(nullptr))
@@ -1303,12 +1573,12 @@ namespace
         if (GetFileAttributesW(data.c_str()) != INVALID_FILE_ATTRIBUTES)
         {
             std::wstring question = L"Do you also want to remove the Rave user data?\n\nThis deletes the Roblox versions and FFlags Rave saved in:\n" + data;
-            if (MessageBoxW(nullptr, question.c_str(), L"Rave Uninstall", MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) == IDYES)
+            if (message(nullptr, question.c_str(), L"Rave Uninstall", MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) == IDYES)
                 removeTree(data);
         }
 
         SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
-        MessageBoxW(nullptr, L"Rave was successfully removed from your computer.", L"Rave Uninstall", MB_OK | MB_ICONINFORMATION);
+        message(nullptr, L"Rave was successfully removed from your computer.", L"Rave Uninstall", MB_OK | MB_ICONINFORMATION);
         return 0;
     }
 
@@ -1358,8 +1628,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int)
     int result;
     if (argc >= 3 && _wcsicmp(argv[1], L"/uninstall-from") == 0)
     {
+        initUi();
         result = runUninstaller(argv[2]);
-        MoveFileExW(self.c_str(), nullptr, MOVEFILE_DELAY_UNTIL_REBOOT);
+        deleteSelfSoon(self);
     }
     else if ((argc >= 2 && _wcsicmp(argv[1], L"/uninstall") == 0) || _wcsicmp(name.c_str(), L"uninstall.exe") == 0)
     {
@@ -1367,6 +1638,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int)
     }
     else
     {
+        initUi();
         result = runInstaller();
     }
 

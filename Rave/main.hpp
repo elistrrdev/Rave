@@ -67,7 +67,14 @@ namespace app
 
 namespace gfx
 {
-    ID3D11ShaderResourceView* loadImage(ID3D11Device* dvc, const void* data, size_t size, int targetHeight, _V2* outSize);
+    struct Image
+    {
+        std::vector<unsigned char> pixels;
+        unsigned w = 0, h = 0;
+    };
+
+    bool decodeImage(const void* data, size_t size, int targetHeight, Image& out);
+    ID3D11ShaderResourceView* createTexture(ID3D11Device* dvc, const Image& img);
 }
 
 struct Fonts {

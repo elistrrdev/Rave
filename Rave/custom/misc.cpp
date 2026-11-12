@@ -15,8 +15,8 @@ auto SetStyle() noexcept -> void {
     style.Colors[ImGuiCol_ChildBg] = colors::Transparent;
     style.Colors[ImGuiCol_ModalWindowDimBg] = RGBA(0, 0, 0, 140);
     style.Colors[ImGuiCol_PopupBg] = RGBA(16, 18, 18, 250);
-    style.Colors[ImGuiCol_Border] = RGBA(106, 221, 187, 40);
-    style.Colors[ImGuiCol_TextSelectedBg] = RGBA(106, 221, 187, 90);
+    style.Colors[ImGuiCol_Border] = colors::withAlpha(colors::Main, 40 / 255.f);
+    style.Colors[ImGuiCol_TextSelectedBg] = colors::withAlpha(colors::Main, 90 / 255.f);
     style.PopupRounding = 10.f;
     style.PopupBorderSize = 1.f;
 }

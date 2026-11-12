@@ -2,15 +2,111 @@
 #include "core/fflags.hpp"
 #include "core/launcher.hpp"
 #include "core/news.hpp"
-#include "core/paths.hpp"
+#include "core/settings.hpp"
 #include "core/system.hpp"
 
 static std::string windowsName;
+
+namespace logo
+{
+	static ID3D11Device* device = nullptr;
+	static gfx::Image original;
+	static uint32_t shown = 0xFFFFFFFF;
+	static const uint32_t kBase = 0x6addbb;
+
+	static float luminance(float r, float g, float b)
+	{
+		return 0.2126f * r + 0.7152f * g + 0.0722f * b;
+	}
+
+	static void refresh(uint32_t accent)
+	{
+		if (accent == shown || original.pixels.empty())
+			return;
+
+		gfx::Image img = original;
+		if (accent != kBase)
+		{
+			float br = (float)((kBase >> 16) & 0xFF), bg = (float)((kBase >> 8) & 0xFF), bb = (float)(kBase & 0xFF);
+			float ar = (float)((accent >> 16) & 0xFF), ag = (float)((accent >> 8) & 0xFF), ab = (float)(accent & 0xFF);
+			float baseLum = luminance(br, bg, bb);
+			for (size_t i = 0; i < img.pixels.size(); i += 4)
+			{
+				if (img.pixels[i + 3] == 0)
+					continue;
+				float lum = luminance(img.pixels[i], img.pixels[i + 1], img.pixels[i + 2]);
+				float r, g, b;
+				if (lum >= baseLum)
+				{
+					float t = std::clamp((lum - baseLum) / (255.f - baseLum), 0.f, 1.f);
+					r = ar + (255.f - ar) * t;
+					g = ag + (255.f - ag) * t;
+					b = ab + (255.f - ab) * t;
+				}
+				else
+				{
+					float t = lum / baseLum;
+					r = ar * t;
+					g = ag * t;
+					b = ab * t;
+				}
+				img.pixels[i] = (unsigned char)std::clamp(r + 0.5f, 0.f, 255.f);
+				img.pixels[i + 1] = (unsigned char)std::clamp(g + 0.5f, 0.f, 255.f);
+				img.pixels[i + 2] = (unsigned char)std::clamp(b + 0.5f, 0.f, 255.f);
+			}
+		}
+
+		ID3D11ShaderResourceView* view = gfx::createTexture(device, img);
+		if (!view)
+			return;
+		if (images::logo)
+			images::logo->Release();
+		images::logo = view;
+		images::logoSize = _V2((float)img.w, (float)img.h);
+		shown = accent;
+	}
+}
+
+static uint32_t accentNow = 0x6addbb;
+
+static void applyAccent(uint32_t rgb)
+{
+	accentNow = rgb;
+	colors::setAccent(rgb);
+}
+
+namespace prefs
+{
+	static bool openRequest = false;
+	static settings::Values draft, original;
+	static const char* kPopup = "SETTINGS";
+
+	static void open()
+	{
+		draft = original = settings::get();
+		openRequest = true;
+	}
+
+	static void saveAndClose()
+	{
+		bool changed = draft.behavior != original.behavior || draft.accent != original.accent;
+		if (changed)
+		{
+			settings::set(draft);
+			if (settings::save())
+				items::sendLog("Settings saved", logType::success);
+			else
+				items::sendLog("Could not write settings.json", logType::error);
+		}
+		CloseCurrentPopup();
+	}
+}
 
 namespace editor
 {
 	static bool openRequest = false;
 	static std::string text;
+	static std::string original;
 	static std::string status;
 	static _V4 statusColor;
 
@@ -20,12 +116,19 @@ namespace editor
 	static void open()
 	{
 		text = fflags::load();
+		original = text;
 		status.clear();
 		openRequest = true;
 	}
 
 	static bool saveAndClose()
 	{
+		if (text == original)
+		{
+			ClearActiveID();
+			CloseCurrentPopup();
+			return true;
+		}
 		std::string error;
 		if (!fflags::save(text, error))
 		{
@@ -55,10 +158,15 @@ void ui::BeforeLoop(ID3D11Device* dvc) {
 	f.RenderFonts();
 	misc::set_blur(window::dx::hwnd);
 
+	applyAccent(settings::get().accent);
+
+	logo::device = dvc;
 	HRSRC res = FindResourceW(nullptr, MAKEINTRESOURCEW(3), RT_RCDATA);
 	HGLOBAL mem = res ? LoadResource(nullptr, res) : nullptr;
-	if (mem)
-		images::logo = gfx::loadImage(dvc, LockResource(mem), SizeofResource(nullptr, res), 30, &images::logoSize);
+	if (mem && gfx::decodeImage(LockResource(mem), SizeofResource(nullptr, res), 30, logo::original))
+		logo::refresh(accentNow);
+
+	launcher::setWindow(window::dx::hwnd);
 
 	windowsName = sys::windowsName();
 
@@ -140,7 +248,7 @@ static void launchPage(ImGuiWindow* window)
 			SetCursorPos({ 20, 20 });
 			misc::child2("LOGS", { c->Size.x - 40, 190 });
 			{
-				PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0, 8 });
+				PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0, 7 });
 				items::renderLogs();
 				PopStyleVar();
 			}
@@ -155,8 +263,8 @@ static void launchPage(ImGuiWindow* window)
 				editor::open();
 
 			SameLine();
-			if (items::button("OPEN DIRECTORY", { GetItemRectSize().x, 45 }))
-				sys::openFolder(paths::localData());
+			if (items::button("SETTINGS", { GetItemRectSize().x, 45 }))
+				prefs::open();
 
 			PopFont();
 		}
@@ -292,8 +400,90 @@ static void fflagsEditor(ImGuiWindow* window)
 	PopStyleVar();
 }
 
+static void settingsWindow(ImGuiWindow* window)
+{
+	if (prefs::openRequest)
+	{
+		OpenPopup(prefs::kPopup);
+		prefs::openRequest = false;
+	}
+
+	const _V2 size = { 520, 360 };
+	SetNextWindowPos(window->Pos + (window->Size - size) / 2, ImGuiCond_Always);
+	SetNextWindowSize(size, ImGuiCond_Always);
+
+	PushStyleVar(ImGuiStyleVar_WindowPadding, { 0, 0 });
+	if (!BeginPopupModal(prefs::kPopup, nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoSavedSettings))
+	{
+		PopStyleVar();
+		return;
+	}
+
+	if (IsKeyPressed(ImGuiKey_Escape, false))
+	{
+		prefs::saveAndClose();
+		EndPopup();
+		PopStyleVar();
+		return;
+	}
+
+	ImGuiWindow* popup = GetCurrentWindow();
+	const float inner = popup->Size.x - 40;
+
+	SetCursorPos({ 20, 20 });
+	misc::renderMulticolorText({ "RAVE ", "SETTINGS" }, { f.montS[1], f.montS[1] }, { colors::Main, colors::Lwhite });
+
+	PushFont(f.montM[0]);
+
+	draw::text("BEHAVIOR ON START", { 20, 72 }, colors::Lwhite);
+
+	struct Option { const char* label; settings::StartBehavior value; };
+	const Option options[] = {
+		{ "KEEP OPEN", settings::StartBehavior::KeepOpen },
+		{ "MINIMIZE", settings::StartBehavior::Minimize },
+		{ "HIDE", settings::StartBehavior::Hide },
+	};
+	const float gap = 10;
+	const _V2 choiceSize = { std::floor((inner - gap * 2) / 3), 38 };
+	for (int i = 0; i < 3; ++i)
+	{
+		SetCursorPos({ 20 + (choiceSize.x + gap) * i, 96 });
+		if (items::choice(options[i].label, prefs::draft.behavior == options[i].value, choiceSize))
+			prefs::draft.behavior = options[i].value;
+	}
+
+	draw::text("What Rave does when Roblox starts.", { 20, 144 }, colors::Gray);
+	draw::text("HIDE brings Rave back when Roblox closes.", { 20, 164 }, colors::Gray);
+
+	draw::text("ACCENT COLOR", { 20, 204 }, colors::Lwhite);
+
+	int count = 0;
+	const settings::Accent* accents = settings::accents(count);
+	const _V2 swatchSize = { std::floor((inner - gap * (count - 1)) / count), 40 };
+	for (int i = 0; i < count; ++i)
+	{
+		SetCursorPos({ 20 + (swatchSize.x + gap) * i, 230 });
+		if (items::swatch(std::string("##accent_") + accents[i].name, accents[i].rgb, prefs::draft.accent == accents[i].rgb, swatchSize))
+		{
+			prefs::draft.accent = accents[i].rgb;
+			applyAccent(accents[i].rgb);
+		}
+	}
+
+	SetCursorPos({ 20, popup->Size.y - 20 - 40 });
+	if (items::button("SAVE", { inner, 40 }))
+		prefs::saveAndClose();
+
+	PopFont();
+
+	EndPopup();
+	PopStyleVar();
+}
+
 void ui::Render() {
 	static int tab = tabs::home;
+
+	logo::refresh(accentNow);
 
 	misc::begin(RAVE_NAME);
 	{
@@ -336,6 +526,7 @@ void ui::Render() {
 		PopStyleVar();
 
 		fflagsEditor(window);
+		settingsWindow(window);
 	}
 	ImGui::End();
 }

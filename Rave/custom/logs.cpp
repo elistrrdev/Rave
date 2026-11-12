@@ -4,24 +4,27 @@
 struct __Logs__
 {
 	std::string content;
-	_V4 color;
+	logType type;
 };
 
 static std::mutex logsLock;
 static std::vector<__Logs__> logs;
 
-static std::map<logType, _V4> logColors =
+static _V4 logColor(logType type)
 {
-	{logType::success, colors::Green},
-	{logType::error, colors::Red},
-	{logType::warn, colors::Accent},
-	{logType::info, colors::Info}
-};
+	switch (type)
+	{
+	case logType::success: return colors::Green;
+	case logType::error: return colors::Red;
+	case logType::warn: return colors::Main;
+	default: return colors::Info;
+	}
+}
 
 auto items::sendLog(std::string log, logType type) noexcept -> void
 {
 	std::lock_guard<std::mutex> guard(logsLock);
-	logs.push_back({ "[" + getLocalTime() + "] - " + log, getColor(logColors, type) });
+	logs.push_back({ "[" + getLocalTime() + "] - " + log, type });
 	while (logs.size() > 8)
 		logs.erase(logs.begin());
 }
@@ -31,5 +34,5 @@ auto items::renderLogs() noexcept -> void
 	std::lock_guard<std::mutex> guard(logsLock);
 
 	for (auto& it : logs)
-		draw::text(it.content, {}, it.color);
+		draw::text(it.content, {}, logColor(it.type));
 }

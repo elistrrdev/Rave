@@ -108,6 +108,7 @@
     <ClCompile Include="core\paths.cpp" />
     <ClCompile Include="core\report.cpp" />
     <ClCompile Include="core\roblox.cpp" />
+    <ClCompile Include="core\settings.cpp" />
     <ClCompile Include="core\system.cpp" />
     <ClCompile Include="core\zip.cpp" />
     <ClCompile Include="main.cpp" />
@@ -135,6 +136,7 @@
     <ClInclude Include="core\paths.hpp" />
     <ClInclude Include="core\report.hpp" />
     <ClInclude Include="core\roblox.hpp" />
+    <ClInclude Include="core\settings.hpp" />
     <ClInclude Include="core\system.hpp" />
     <ClInclude Include="core\zip.hpp" />
     <ClInclude Include="__ext\fonts.h" />

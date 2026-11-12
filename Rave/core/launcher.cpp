@@ -2,6 +2,7 @@
 #include "fflags.hpp"
 #include "report.hpp"
 #include "roblox.hpp"
+#include "settings.hpp"
 #include <windows.h>
 #include <objbase.h>
 #include <atomic>
@@ -15,6 +16,13 @@ namespace
     std::mutex stateLock;
     launcher::Snapshot state;
     launcher::Logger logger;
+    HWND window = nullptr;
+
+    std::atomic<bool> watching{ false };
+    std::atomic<bool> behaviorPending{ false };
+    std::atomic<bool> seenRunning{ false };
+    std::atomic<bool> hiddenByRave{ false };
+    std::atomic<DWORD> watchStarted{ 0 };
 
     void log(const std::string& text, launcher::LogLevel level)
     {
@@ -43,6 +51,65 @@ namespace
         std::string error;
         if (roblox::fetchLatest(latest, error))
             storeLatest(latest.guid);
+    }
+
+    void windowAction(launcher::WindowAction action)
+    {
+        if (window)
+            PostMessageW(window, launcher::WM_RAVE_WINDOW, (WPARAM)action, 0);
+    }
+
+    void applyStartBehavior()
+    {
+        settings::StartBehavior behavior = settings::get().behavior;
+        if (behavior == settings::StartBehavior::Minimize)
+            windowAction(launcher::WindowMinimize);
+        else if (behavior == settings::StartBehavior::Hide)
+        {
+            hiddenByRave = true;
+            windowAction(launcher::WindowHide);
+        }
+    }
+
+    void watchTick()
+    {
+        static int missing = 0;
+        if (!watching)
+        {
+            missing = 0;
+            return;
+        }
+
+        bool running = roblox::isRunning();
+        if (running)
+        {
+            missing = 0;
+            seenRunning = true;
+            if (behaviorPending.exchange(false))
+                applyStartBehavior();
+            return;
+        }
+
+        if (!seenRunning)
+        {
+            if (GetTickCount() - watchStarted.load() > 60000)
+            {
+                watching = false;
+                behaviorPending = false;
+            }
+            return;
+        }
+
+        if (++missing < 2)
+            return;
+
+        missing = 0;
+        watching = false;
+        seenRunning = false;
+        behaviorPending = false;
+        log("Roblox was closed", launcher::LogLevel::Info);
+        if (hiddenByRave.exchange(false))
+            windowAction(launcher::WindowRestore);
     }
 
     void runLaunch()
@@ -106,6 +173,11 @@ namespace
         }
         log(started ? "Roblox is running" : "Roblox was started, waiting for it to open", started ? launcher::LogLevel::Success : launcher::LogLevel::Warn);
 
+        watchStarted = GetTickCount();
+        seenRunning = false;
+        behaviorPending = true;
+        watching = true;
+
         currentTask = launcher::Task::Idle;
         CoUninitialize();
     }
@@ -116,13 +188,25 @@ void launcher::setLogger(Logger l)
     logger = std::move(l);
 }
 
+void launcher::setWindow(void* hwnd)
+{
+    window = (HWND)hwnd;
+}
+
 void launcher::startMonitor()
 {
     std::thread([] {
+        refreshLatest();
+        DWORD lastLatest = GetTickCount();
         for (;;)
         {
-            refreshLatest();
-            Sleep(10 * 60 * 1000);
+            Sleep(1000);
+            watchTick();
+            if (GetTickCount() - lastLatest > 10 * 60 * 1000)
+            {
+                refreshLatest();
+                lastLatest = GetTickCount();
+            }
         }
     }).detach();
 }

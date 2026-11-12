@@ -191,11 +191,6 @@ std::vector<DWORD> sys::findProcesses(const std::wstring& exeName)
     return result;
 }
 
-void sys::openFolder(const std::wstring& path)
-{
-    ShellExecuteW(nullptr, L"open", path.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
-}
-
 std::string sys::narrow(const std::wstring& s)
 {
     if (s.empty())

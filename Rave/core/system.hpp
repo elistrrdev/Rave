@@ -17,7 +17,6 @@ namespace sys
     std::wstring exePath();
     bool launchUnelevated(const std::wstring& exe, const std::wstring& args, const std::wstring& dir);
     std::vector<DWORD> findProcesses(const std::wstring& exeName);
-    void openFolder(const std::wstring& path);
 
     std::string narrow(const std::wstring& s);
     std::wstring widen(const std::string& s);
