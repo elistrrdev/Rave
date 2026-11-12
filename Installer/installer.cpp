@@ -80,6 +80,7 @@ namespace
     bool installing = false;
     bool installed = false;
     bool failed = false;
+    bool keyboardCues = false;
 
     int S(int v) { return MulDiv(v, dpi, 96); }
 
@@ -1043,7 +1044,7 @@ namespace
             SetBkMode(dc, TRANSPARENT);
             SetTextColor(dc, IsWindowEnabled(hwnd) ? theme.text : theme.line);
             DrawTextW(dc, label, -1, &textRc, DT_SINGLELINE | DT_VCENTER);
-            if (GetFocus() == hwnd)
+            if (keyboardCues && GetFocus() == hwnd)
             {
                 RECT measure = textRc;
                 DrawTextW(dc, label, -1, &measure, DT_SINGLELINE | DT_VCENTER | DT_CALCRECT);
@@ -1531,6 +1532,12 @@ namespace
         MSG msg;
         while (GetMessageW(&msg, nullptr, 0, 0) > 0)
         {
+            if (!keyboardCues && msg.message == WM_KEYDOWN && (msg.wParam == VK_TAB || msg.wParam == VK_LEFT || msg.wParam == VK_RIGHT || msg.wParam == VK_UP || msg.wParam == VK_DOWN))
+            {
+                keyboardCues = true;
+                if (HWND focused = GetFocus())
+                    InvalidateRect(focused, nullptr, FALSE);
+            }
             if (msg.message == WM_KEYDOWN && page == PageLicense && (msg.wParam == VK_NEXT || msg.wParam == VK_PRIOR) && GetFocus() != licenseEdit)
             {
                 SendMessageW(licenseEdit, EM_SCROLL, msg.wParam == VK_NEXT ? SB_PAGEDOWN : SB_PAGEUP, 0);
