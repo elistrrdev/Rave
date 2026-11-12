@@ -2,7 +2,7 @@
 
 # Rave plan
 
-## V0.1 (current)
+## V0.2 (current)
 
 Done in code:
 
@@ -12,12 +12,14 @@ Done in code:
       accent color swatches (recolors the whole UI and the header logo), saved in settings.json
 - [x] Home log also shows "Roblox was closed", last log line no longer cut off
 - [x] "FFlags saved" only when the FFlags really changed
-- [x] Info page: Rave version, Windows, latest Roblox version, CPU, GPU, RAM, display, HardwareID (click to copy)
+- [x] Info page: top has Rave version and latest Roblox, a divider line, then the specs (Windows, CPU, GPU, RAM,
+      display) and HardwareID (click to copy) as the last row
 - [x] Accounts page: account manager with avatars, USE / IN USE, REMOVE (with SURE?), USE ROBLOX'S OWN LOGIN
 - [x] Add Account popup: Quick Login (code + QR, confirm on a signed in device) and cookie login (.ROBLOSECURITY)
+- [x] Quick Login auto-copies the code to the clipboard and opens the Roblox Quick Log In page in the default browser
 - [x] Accounts are stored encrypted with DPAPI in accounts.dat, cookie rotation is saved, expired logins are marked
 - [x] LAUNCH ROBLOX with a selected account starts Roblox already signed in (one-time authentication ticket)
-- [x] Bottom right text "Rave V0.1"
+- [x] Bottom right text "Rave V0.2" (version lives only in version.hpp, bumped 0.1 -> 0.2)
 - [x] Main color #6addbb with variants
 - [x] New logo: logo.png in the header, logo-bg.ico (rounded corners) as exe icon, logo.ico for taskbar and shortcuts (assets\)
 - [x] No animations, no intro arrow, tabs switch instantly
@@ -55,17 +57,18 @@ Waiting for the user:
       REMOVE (SURE?), USE ROBLOX'S OWN LOGIN, restart Rave and check that accounts and selection are still there
 - [ ] Test LAUNCH ROBLOX with a selected account: Roblox has to open already signed in with that account
       (the Home log says "Launching Roblox as ..."), and without an account it has to work like before
-- [ ] Test the Info tab: specs look right, HardwareID stays the same after a restart, click copies it
+- [ ] Test that QUICK LOGIN copied the code and opened the right Roblox page in the default browser
+- [ ] Test the Info tab: specs look right, Rave version shows V0.2, HardwareID stays the same after a restart, click copies it
 - [ ] Test on Windows 10 if possible (corners, blur)
 - [ ] Read the new License Agreement in the installer (and maybe have it checked by a lawyer before V0.2 goes public)
 - [ ] Fill the public releases repo (README.md, LICENSE with the Rave terms) and publish the first release there
 
-## V0.2
-
-- [ ] Decide the main feature of V0.2
 
 ## Ideas for later (not promised)
 
+- Show the account a user is already signed into Roblox with in the account manager (not done: the Roblox client
+  keeps no reusable login Rave can read, and reading the browser cookie store is exactly the cookie-stealer
+  behavior Rave avoids)
 - Register Rave as the `roblox-player:` protocol handler so joining from the website goes through Rave
 - Rave self update from GitHub releases
 - FFlags presets (FPS unlock, low graphics) as one click buttons inside the editor

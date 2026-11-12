@@ -251,7 +251,10 @@ namespace addacc
 	static unsigned addedAtOpen = 0;
 	static unsigned qrShown = 0xFFFFFFFF;
 	static ID3D11ShaderResourceView* qrTexture = nullptr;
+	static bool autoOpened = false;
+	static std::string lastAutoCode;
 	static const char* kPopup = "ADD ACCOUNT";
+	static const wchar_t* kLoginUrl = L"https://www.roblox.com/crossdevicelogin/ConfirmCode";
 
 	static void clearCookie()
 	{
@@ -264,6 +267,8 @@ namespace addacc
 		clearCookie();
 		accounts::resetPaste();
 		addedAtOpen = accounts::addedCount();
+		autoOpened = false;
+		lastAutoCode.clear();
 		accounts::startQuick();
 		openRequest = true;
 	}
@@ -466,7 +471,7 @@ static void accountsPage(ImGuiWindow* window)
 			addacc::open();
 
 		SetCursorPos({ 20 + half + 12, c->Size.y - 20 - 45 });
-		if (items::choice("USE ROBLOX'S OWN LOGIN", selected == 0, { inner - half - 12, 45 }))
+		if (items::choice("USE ROBLOX'S OWN LOGIN", selected == 0, { inner - half - 12, 45 }, 0.f))
 			accounts::select(0);
 
 		PopFont();
@@ -485,55 +490,49 @@ static void infoPage(ImGuiWindow* window)
 		launcher::Snapshot snap = launcher::snapshot();
 		const sysinfo::Specs& specs = sysinfo::get();
 
-		PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0, 13 });
+		PushFont(f.montM[1]);
+
+		float y = 28;
+		const float step = 30;
+		auto rowAt = [&](const char* label, const std::string& value) {
+			SetCursorPos({ 30, y });
+			misc::row(label, value);
+			y += step;
+		};
+
+		rowAt("Rave Version: ", "V" RAVE_VERSION_STR);
+		rowAt("Latest Roblox: ", snap.latestKnown ? snap.latest : "Checking...");
+
+		y += 5;
+		draw::rect({ 30, y }, { c->Size.x - 60, 1 }, colors::withAlpha(colors::Lwhite, 0.10f));
+		y += 16;
+
+		rowAt("Windows: ", windowsName);
+		rowAt("CPU: ", specs.cpu);
+		rowAt("GPU: ", specs.gpu);
+		rowAt("RAM: ", specs.ram);
+		rowAt("Display: ", specs.display);
+		rowAt("HardwareID: ", specs.hwid);
+
+		_V2 rowMin = GetItemRectMin(), rowMax = GetItemRectMax();
+		bool hovered = IsWindowHovered() && IsMouseHoveringRect(rowMin, rowMax);
+		if (hovered)
 		{
-			PushFont(f.montM[1]);
-
-			SetCursorPos({ 30, 30 });
-			misc::row("Rave Version: ", "V" RAVE_VERSION_STR);
-
-			SetCursorPosX(30);
-			misc::row("Windows: ", windowsName);
-
-			SetCursorPosX(30);
-			misc::row("Latest Roblox: ", snap.latestKnown ? snap.latest : "Checking...");
-
-			SetCursorPosX(30);
-			misc::row("CPU: ", specs.cpu);
-
-			SetCursorPosX(30);
-			misc::row("GPU: ", specs.gpu);
-
-			SetCursorPosX(30);
-			misc::row("RAM: ", specs.ram);
-
-			SetCursorPosX(30);
-			misc::row("Display: ", specs.display);
-
-			SetCursorPosX(30);
-			misc::row("HardwareID: ", specs.hwid);
-
-			_V2 rowMin = GetItemRectMin(), rowMax = GetItemRectMax();
-			bool hovered = IsWindowHovered() && IsMouseHoveringRect(rowMin, rowMax);
-			if (hovered)
+			SetMouseCursor(ImGuiMouseCursor_Hand);
+			if (IsMouseClicked(ImGuiMouseButton_Left))
 			{
-				SetMouseCursor(ImGuiMouseCursor_Hand);
-				if (IsMouseClicked(ImGuiMouseButton_Left))
-				{
-					SetClipboardText(specs.hwid.c_str());
-					copiedAt = GetTime();
-				}
+				SetClipboardText(specs.hwid.c_str());
+				copiedAt = GetTime();
 			}
-
-			PopFont();
-
-			PushFont(f.montM[0]);
-			const char* note = GetTime() - copiedAt < 2.0 ? "copied" : hovered ? "click to copy" : nullptr;
-			if (note)
-				c->DrawList->AddText(_V2(rowMax.x + 12, rowMax.y - GetFontSize() - 1), _CO(colors::Gray), note);
-			PopFont();
 		}
-		PopStyleVar();
+
+		PopFont();
+
+		PushFont(f.montM[0]);
+		const char* note = GetTime() - copiedAt < 2.0 ? "copied" : hovered ? "click to copy" : nullptr;
+		if (note)
+			c->DrawList->AddText(_V2(rowMax.x + 12, rowMax.y - GetFontSize() - 1), _CO(colors::Gray), note);
+		PopFont();
 	}
 	EndChild();
 }
@@ -595,6 +594,17 @@ static void addAccountWindow(ImGuiWindow* window)
 		accounts::Quick q = accounts::quick();
 		addacc::refreshQr(q.qrVersion);
 
+		if (!q.code.empty() && q.code != addacc::lastAutoCode)
+		{
+			addacc::lastAutoCode = q.code;
+			SetClipboardText(q.code.c_str());
+			if (!addacc::autoOpened)
+			{
+				addacc::autoOpened = true;
+				sys::openUrl(addacc::kLoginUrl);
+			}
+		}
+
 		const _V2 qrPos = { 20, 112 };
 		const _V2 qrBox = { 156, 156 };
 		_V2 screen = popup->Pos + qrPos;
@@ -627,7 +637,7 @@ static void addAccountWindow(ImGuiWindow* window)
 		PopFont();
 
 		float y = 176;
-		y += wrapText(popup, { x, y }, colors::Lwhite, "On a signed in device, open Roblox Settings > Quick Log In and enter this code, or scan the QR code.", col);
+		y += wrapText(popup, { x, y }, colors::Lwhite, "Rave copied this code and opened the Quick Log In page in your browser. Enter or paste it there, or scan the QR code on your phone.", col);
 
 		_V4 statusColor = colors::Gray;
 		switch (q.state)

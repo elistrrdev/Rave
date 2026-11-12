@@ -56,7 +56,8 @@ Roblox client into its own folder and starts it from there.
 |   |   |-- inflate.*      raw DEFLATE decoder (used by zip)
 |   |   |-- zip.*          zip reader/extractor with CRC32 check and path traversal guard
 |   |   |-- paths.*        %LOCALAPPDATA%\Rave, Versions folder, %TEMP%\rave-temp, folder helpers
-|   |   |-- system.*       admin check (crash report), Windows version, unelevated launch, process lookup, md5
+|   |   |-- system.*       admin check (crash report), Windows version, unelevated launch, open url in the default
+|                          browser, process lookup, md5
 |   |   |-- roblox.*       latest version lookup, package download/verify/extract, launch, running check
 |   |   |-- launcher.*     background launch worker (signed in launch), Roblox watcher (start behavior, "closed" log),
 |                          latest version state
@@ -128,10 +129,10 @@ Roblox client into its own folder and starts it from there.
   - Empty list: "No accounts added yet" and a short hint, centered.
   - ADD ACCOUNT opens the Add Account popup. USE ROBLOX'S OWN LOGIN (filled when no account is selected) clears
     the selection, then LAUNCH ROBLOX starts Roblox exactly like before (`--app`, Roblox uses its own saved login).
-- **Info**: label/value rows (label in Main, value in Lwhite): Rave Version, Windows, Latest Roblox, CPU, GPU, RAM,
-  Display, HardwareID (always the last row). The latest Roblox version is fetched on start and every 10 minutes by
-  the launcher monitor. Hovering the HardwareID shows a hand cursor and "click to copy", a click copies it and shows
-  "copied" for 2 seconds.
+- **Info**: label/value rows (label in Main, value in Lwhite). On top Rave Version and Latest Roblox, then a thin
+  divider line, then the system specs: Windows, CPU, GPU, RAM, Display, HardwareID (always the last row). The latest
+  Roblox version is fetched on start and every 10 minutes by the launcher monitor. Hovering the HardwareID shows a
+  hand cursor and "click to copy", a click copies it and shows "copied" for 2 seconds.
 - Bottom right: "Rave V0.1" (from version.hpp).
 
 ## Add Account popup (ui.cpp namespace `addacc` + core/accounts.cpp)
@@ -145,6 +146,10 @@ Roblox client into its own folder and starts it from there.
   then confirms there. The status line shows waiting / "Confirm the login for @name" / signing in / errors.
   Codes run out after about 2 minutes, a new one is fetched automatically (5 times), then NEW CODE appears in the
   QR box.
+  When a code first appears, Rave copies it to the clipboard and opens the Quick Log In page
+  (`https://www.roblox.com/crossdevicelogin/ConfirmCode`, through `sys::openUrl`) in the default browser once per
+  popup. Every later (renewed) code is copied to the clipboard again, the browser is not opened again. The code is
+  never put into the URL.
 - COOKIE: a masked text box for the `.ROBLOSECURITY` cookie, PASTE (clipboard) and ADD ACCOUNT, a red warning to
   never share the cookie. Quotes, spaces and a leading `.ROBLOSECURITY=` are removed. Only printable ASCII without
   `;` and `,` is accepted (so a cookie can never inject extra HTTP headers).

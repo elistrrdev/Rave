@@ -83,6 +83,13 @@ std::wstring sys::exePath()
     }
 }
 
+void sys::openUrl(const std::wstring& url)
+{
+    if (url.rfind(L"https://", 0) != 0)
+        return;
+    ShellExecuteW(nullptr, L"open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+}
+
 namespace
 {
     bool shellExecuteAsDesktop(const std::wstring& exe, const std::wstring& args, const std::wstring& dir)

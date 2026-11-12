@@ -46,7 +46,7 @@ namespace items
 {
     auto input(const std::string& label, char* buf, size_t bufsize) noexcept -> bool;
     auto button(const std::string& label, const _V2& size) noexcept -> bool;
-    auto choice(const std::string& label, bool selected, const _V2& size) noexcept -> bool;
+    auto choice(const std::string& label, bool selected, const _V2& size, float rounding = 6.f) noexcept -> bool;
     auto swatch(const std::string& id, uint32_t rgb, bool selected, const _V2& size) noexcept -> bool;
     auto tab(const std::string& label, bool cond) noexcept -> bool;
     auto sendLog(std::string log, logType type) noexcept -> void;

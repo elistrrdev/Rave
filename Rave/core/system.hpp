@@ -12,6 +12,7 @@ namespace sys
     std::string windowsName();
 
     std::wstring exePath();
+    void openUrl(const std::wstring& url);
     bool launchUnelevated(const std::wstring& exe, const std::wstring& args, const std::wstring& dir);
     std::vector<DWORD> findProcesses(const std::wstring& exeName);
 

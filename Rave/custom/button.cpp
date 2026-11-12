@@ -39,7 +39,7 @@ auto items::button(const std::string& label, const _V2& size) noexcept -> bool
 	return r;
 }
 
-auto items::choice(const std::string& label, bool selected, const _V2& size) noexcept -> bool
+auto items::choice(const std::string& label, bool selected, const _V2& size, float rounding) noexcept -> bool
 {
 	ImGuiWindow* window = GetCurrentWindow();
 
@@ -53,7 +53,7 @@ auto items::choice(const std::string& label, bool selected, const _V2& size) noe
 	_V4 bgcol = selected ? colors::Main : hov ? _V4(RGBA(255, 255, 255, 31)) : _V4(RGBA(255, 255, 255, 15));
 	_V4 textcol = selected ? buttoncol::textC : colors::Lwhite;
 
-	window->DrawList->AddRectFilled(pos, pos + size, _CO(bgcol), 6.f);
+	window->DrawList->AddRectFilled(pos, pos + size, _CO(bgcol), rounding);
 	window->DrawList->AddText(pos + (size - lSize) / 2, _CO(textcol), shown.c_str());
 
 	return r;
