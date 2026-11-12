@@ -354,8 +354,3 @@ bool roblox::isRunning()
 {
     return !sys::findProcesses(kPlayerExe).empty();
 }
-
-int roblox::close()
-{
-    return sys::killProcesses(kPlayerExe);
-}

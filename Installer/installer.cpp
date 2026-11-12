@@ -1,6 +1,8 @@
 #include <windows.h>
+#include <windowsx.h>
 #include <commctrl.h>
-#include <prsht.h>
+#include <uxtheme.h>
+#include <dwmapi.h>
 #include <shlobj.h>
 #include <shobjidl.h>
 #include <shldisp.h>
@@ -8,6 +10,7 @@
 #include <shlwapi.h>
 #include <tlhelp32.h>
 #include <wrl/client.h>
+#include <algorithm>
 #include <string>
 #include <thread>
 #include <vector>
@@ -18,25 +21,67 @@ using Microsoft::WRL::ComPtr;
 
 namespace
 {
-    const wchar_t* kTitle = L"Rave V" RAVE_VERSION_WSTR L" Setup";
+    const wchar_t* kTitle = L"Rave Setup";
+    const wchar_t* kWindowClass = L"RaveSetupWindow";
+    const wchar_t* kCheckClass = L"RaveSetupCheck";
     const wchar_t* kUninstallKey = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Rave";
     const wchar_t* kAppKey = L"SOFTWARE\\Rave";
     const UINT WM_INSTALL_STATUS = WM_APP + 1;
-    const UINT WM_INSTALL_PROGRESS = WM_APP + 2;
-    const UINT WM_INSTALL_DONE = WM_APP + 3;
+    const UINT WM_INSTALL_DONE = WM_APP + 2;
+
+    enum Page { PageWelcome, PageLicense, PageLocation, PageOptions, PageInstall, PageFinish };
+
+    enum ControlId
+    {
+        ID_BACK = 100,
+        ID_NEXT = 101,
+        ID_CANCEL = IDCANCEL,
+        ID_LICENSE = 110,
+        ID_ACCEPT = 111,
+        ID_PATH = 112,
+        ID_BROWSE = 113,
+        ID_STARTMENU = 114,
+        ID_DESKTOP = 115,
+        ID_DETAILS = 116,
+        ID_LAUNCH = 117,
+    };
+
+    const int kWidth = 500;
+    const int kHeight = 386;
+    const int kBand = 339;
+    const int kHeader = 58;
+    const int kWatermark = 164;
 
     HINSTANCE instance;
-    HFONT titleFont;
-    HICON appIcon;
-    HICON appIconSmall;
-    HWND sheet;
+    HWND mainWindow;
+    int dpi = 96;
 
+    HFONT bodyFont, boldFont, titleFont;
+    HICON appIcon, appIconSmall, headerIcon;
+    HBITMAP watermark;
+
+    struct Theme
+    {
+        bool dark = false;
+        COLORREF content, panel, text, subtext, line, lineLight, field, fieldText, accent, track, trackBorder, boxBorder, check;
+        HBRUSH contentBrush = nullptr, panelBrush = nullptr, fieldBrush = nullptr;
+    } theme;
+
+    HWND licenseEdit, acceptCheck, pathEdit, browseButton, startMenuCheck, desktopCheck, detailsList, launchCheck;
+    HWND backButton, nextButton, cancelButton;
+
+    int page = PageWelcome;
     std::wstring installDir;
+    std::wstring spaceRequired, spaceAvailable;
+    std::wstring status = L"Preparing...";
+    int progress = 0;
     bool startMenu = true;
     bool desktop = true;
-    bool launchAfter = true;
     bool installing = false;
     bool installed = false;
+    bool failed = false;
+
+    int S(int v) { return MulDiv(v, dpi, 96); }
 
     struct Resource
     {
@@ -83,11 +128,11 @@ namespace
         }
     }
 
-    std::wstring regRead(const wchar_t* key, const wchar_t* value)
+    std::wstring regRead(HKEY root, const wchar_t* key, const wchar_t* value, DWORD flags = RRF_SUBKEY_WOW6464KEY)
     {
         wchar_t buf[MAX_PATH * 2]{};
         DWORD size = sizeof(buf);
-        if (RegGetValueW(HKEY_LOCAL_MACHINE, key, value, RRF_RT_REG_SZ | RRF_SUBKEY_WOW6464KEY, nullptr, buf, &size) == ERROR_SUCCESS)
+        if (RegGetValueW(root, key, value, RRF_RT_REG_SZ | flags, nullptr, buf, &size) == ERROR_SUCCESS)
             return buf;
         return {};
     }
@@ -284,13 +329,148 @@ namespace
 
     std::wstring defaultDir()
     {
-        std::wstring existing = regRead(kAppKey, L"InstallPath");
+        std::wstring existing = regRead(HKEY_LOCAL_MACHINE, kAppKey, L"InstallPath");
         if (!existing.empty())
             return existing;
         return knownFolder(FOLDERID_ProgramFiles) + L"\\Rave";
     }
 
-    HBITMAP makeBitmap(int w, int h, bool watermark)
+    enum class AppMode { Default, AllowDark, ForceDark, ForceLight };
+    using SetPreferredAppModeFn = AppMode(WINAPI*)(AppMode);
+    using AllowDarkModeForWindowFn = bool(WINAPI*)(HWND, bool);
+    using RefreshPolicyFn = void(WINAPI*)();
+
+    AllowDarkModeForWindowFn allowDarkModeForWindow = nullptr;
+
+    DWORD windowsBuild()
+    {
+        using RtlGetVersionFn = LONG(WINAPI*)(PRTL_OSVERSIONINFOW);
+        RTL_OSVERSIONINFOW info{};
+        info.dwOSVersionInfoSize = sizeof(info);
+        HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
+        auto fn = ntdll ? (RtlGetVersionFn)GetProcAddress(ntdll, "RtlGetVersion") : nullptr;
+        if (fn && fn(&info) == 0)
+            return info.dwBuildNumber;
+        return 0;
+    }
+
+    void initDarkModeSupport()
+    {
+        if (windowsBuild() < 18362)
+            return;
+        HMODULE ux = LoadLibraryExW(L"uxtheme.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+        if (!ux)
+            return;
+        auto setMode = (SetPreferredAppModeFn)GetProcAddress(ux, MAKEINTRESOURCEA(135));
+        auto refresh = (RefreshPolicyFn)GetProcAddress(ux, MAKEINTRESOURCEA(104));
+        allowDarkModeForWindow = (AllowDarkModeForWindowFn)GetProcAddress(ux, MAKEINTRESOURCEA(133));
+        if (setMode)
+            setMode(AppMode::AllowDark);
+        if (refresh)
+            refresh();
+    }
+
+    bool systemUsesDarkApps()
+    {
+        DWORD value = 1, size = sizeof(value);
+        if (RegGetValueW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", L"AppsUseLightTheme", RRF_RT_REG_DWORD, nullptr, &value, &size) != ERROR_SUCCESS)
+            return false;
+        HIGHCONTRAST hc{ sizeof(hc) };
+        if (SystemParametersInfoW(SPI_GETHIGHCONTRAST, sizeof(hc), &hc, 0) && (hc.dwFlags & HCF_HIGHCONTRASTON))
+            return false;
+        return value == 0;
+    }
+
+    void themeControl(HWND hwnd, const wchar_t* darkTheme)
+    {
+        if (!hwnd)
+            return;
+        if (allowDarkModeForWindow)
+            allowDarkModeForWindow(hwnd, theme.dark);
+        SetWindowTheme(hwnd, theme.dark ? darkTheme : L"Explorer", nullptr);
+        SendMessageW(hwnd, WM_THEMECHANGED, 0, 0);
+    }
+
+    void applyTheme()
+    {
+        theme.dark = systemUsesDarkApps();
+        if (theme.dark)
+        {
+            theme.content = RGB(32, 32, 32);
+            theme.panel = RGB(43, 43, 43);
+            theme.text = RGB(255, 255, 255);
+            theme.subtext = RGB(206, 206, 206);
+            theme.line = RGB(64, 64, 64);
+            theme.lineLight = RGB(64, 64, 64);
+            theme.field = RGB(25, 25, 25);
+            theme.fieldText = RGB(240, 240, 240);
+            theme.track = RGB(55, 55, 55);
+            theme.trackBorder = RGB(80, 80, 80);
+            theme.boxBorder = RGB(170, 170, 170);
+            theme.check = RGB(15, 15, 15);
+        }
+        else
+        {
+            theme.content = GetSysColor(COLOR_3DFACE);
+            theme.panel = RGB(255, 255, 255);
+            theme.text = RGB(0, 0, 0);
+            theme.subtext = RGB(0, 0, 0);
+            theme.line = RGB(160, 160, 160);
+            theme.lineLight = RGB(255, 255, 255);
+            theme.field = RGB(255, 255, 255);
+            theme.fieldText = RGB(0, 0, 0);
+            theme.track = RGB(230, 230, 230);
+            theme.trackBorder = RGB(188, 188, 188);
+            theme.boxBorder = RGB(51, 51, 51);
+            theme.check = RGB(15, 15, 15);
+        }
+        theme.accent = RGB(106, 221, 187);
+
+        if (theme.contentBrush) DeleteObject(theme.contentBrush);
+        if (theme.panelBrush) DeleteObject(theme.panelBrush);
+        if (theme.fieldBrush) DeleteObject(theme.fieldBrush);
+        theme.contentBrush = CreateSolidBrush(theme.content);
+        theme.panelBrush = CreateSolidBrush(theme.panel);
+        theme.fieldBrush = CreateSolidBrush(theme.field);
+
+        if (!mainWindow)
+            return;
+
+        if (allowDarkModeForWindow)
+            allowDarkModeForWindow(mainWindow, theme.dark);
+        BOOL dark = theme.dark ? TRUE : FALSE;
+        if (FAILED(DwmSetWindowAttribute(mainWindow, 20, &dark, sizeof(dark))))
+            DwmSetWindowAttribute(mainWindow, 19, &dark, sizeof(dark));
+
+        themeControl(licenseEdit, L"DarkMode_Explorer");
+        themeControl(pathEdit, L"DarkMode_CFD");
+        themeControl(detailsList, L"DarkMode_Explorer");
+        themeControl(browseButton, L"DarkMode_Explorer");
+        themeControl(backButton, L"DarkMode_Explorer");
+        themeControl(nextButton, L"DarkMode_Explorer");
+        themeControl(cancelButton, L"DarkMode_Explorer");
+
+        RedrawWindow(mainWindow, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_FRAME | RDW_ALLCHILDREN | RDW_UPDATENOW);
+    }
+
+    bool exteriorPage()
+    {
+        return page == PageWelcome || page == PageFinish;
+    }
+
+    COLORREF backgroundAt(HWND child)
+    {
+        RECT rc;
+        GetWindowRect(child, &rc);
+        MapWindowPoints(nullptr, mainWindow, (POINT*)&rc, 2);
+        if (rc.top >= S(kBand))
+            return theme.content;
+        if (exteriorPage())
+            return theme.panel;
+        return rc.top < S(kHeader) ? theme.panel : theme.content;
+    }
+
+    HBITMAP makeWatermark(int w, int h)
     {
         BITMAPINFO bi{};
         bi.bmiHeader.biSize = sizeof(bi.bmiHeader);
@@ -308,174 +488,183 @@ namespace
         HDC dc = CreateCompatibleDC(nullptr);
         HGDIOBJ old = SelectObject(dc, bmp);
 
-        if (watermark)
+        for (int y = 0; y < h; ++y)
         {
-            for (int y = 0; y < h; ++y)
-            {
-                float t = (float)y / (float)h;
-                int r = (int)(14 + (20 - 14) * t);
-                int g = (int)(20 + (44 - 20) * t);
-                int b = (int)(19 + (38 - 19) * t);
-                HBRUSH brush = CreateSolidBrush(RGB(r, g, b));
-                RECT line{ 0, y, w, y + 1 };
-                FillRect(dc, &line, brush);
-                DeleteObject(brush);
-            }
-
-            int iconSize = w * 2 / 3;
-            HICON big = (HICON)LoadImageW(instance, MAKEINTRESOURCEW(IDI_LOGO), IMAGE_ICON, iconSize, iconSize, 0);
-            if (big)
-            {
-                DrawIconEx(dc, (w - iconSize) / 2, h / 2 - iconSize, big, iconSize, iconSize, 0, nullptr, DI_NORMAL);
-                DestroyIcon(big);
-            }
-
-            SetBkMode(dc, TRANSPARENT);
-            int height = -MulDiv(h, 9, 100);
-            HFONT font = CreateFontW(height, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Segoe UI");
-            HGDIOBJ oldFont = SelectObject(dc, font);
-            SetTextColor(dc, RGB(228, 228, 228));
-            RECT text{ 0, h / 2 + h / 40, w, h / 2 + h / 6 };
-            DrawTextW(dc, L"Rave", -1, &text, DT_CENTER | DT_SINGLELINE | DT_VCENTER);
-            SelectObject(dc, oldFont);
-            DeleteObject(font);
-
-            font = CreateFontW(height / 2, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Segoe UI");
-            oldFont = SelectObject(dc, font);
-            SetTextColor(dc, RGB(106, 221, 187));
-            RECT ver{ 0, h / 2 + h / 6, w, h / 2 + h / 6 + h / 14 };
-            DrawTextW(dc, L"V" RAVE_VERSION_WSTR, -1, &ver, DT_CENTER | DT_SINGLELINE | DT_VCENTER);
-            SelectObject(dc, oldFont);
-            DeleteObject(font);
-        }
-        else
-        {
-            RECT all{ 0, 0, w, h };
-            HBRUSH brush = CreateSolidBrush(GetSysColor(COLOR_WINDOW));
-            FillRect(dc, &all, brush);
+            float t = (float)y / (float)h;
+            HBRUSH brush = CreateSolidBrush(RGB((int)(14 + 6 * t), (int)(20 + 24 * t), (int)(19 + 19 * t)));
+            RECT line{ 0, y, w, y + 1 };
+            FillRect(dc, &line, brush);
             DeleteObject(brush);
-            HICON icon = (HICON)LoadImageW(instance, MAKEINTRESOURCEW(IDI_LOGO), IMAGE_ICON, w, h, 0);
-            if (icon)
-            {
-                DrawIconEx(dc, 0, 0, icon, w, h, 0, nullptr, DI_NORMAL);
-                DestroyIcon(icon);
-            }
         }
+
+        int iconSize = w * 2 / 3;
+        HICON big = (HICON)LoadImageW(instance, MAKEINTRESOURCEW(IDI_LOGO), IMAGE_ICON, iconSize, iconSize, 0);
+        if (big)
+        {
+            DrawIconEx(dc, (w - iconSize) / 2, h / 2 - iconSize, big, iconSize, iconSize, 0, nullptr, DI_NORMAL);
+            DestroyIcon(big);
+        }
+
+        SetBkMode(dc, TRANSPARENT);
+        int height = -MulDiv(h, 9, 100);
+        HFONT font = CreateFontW(height, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Segoe UI");
+        HGDIOBJ oldFont = SelectObject(dc, font);
+        SetTextColor(dc, RGB(228, 228, 228));
+        RECT text{ 0, h / 2 + h / 40, w, h / 2 + h / 6 };
+        DrawTextW(dc, L"Rave", -1, &text, DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+        SelectObject(dc, oldFont);
+        DeleteObject(font);
+
+        font = CreateFontW(height / 2, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Segoe UI");
+        oldFont = SelectObject(dc, font);
+        SetTextColor(dc, RGB(106, 221, 187));
+        RECT ver{ 0, h / 2 + h / 6, w, h / 2 + h / 6 + h / 14 };
+        DrawTextW(dc, L"V" RAVE_VERSION_WSTR, -1, &ver, DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+        SelectObject(dc, oldFont);
+        DeleteObject(font);
 
         SelectObject(dc, old);
         DeleteDC(dc);
         return bmp;
     }
 
-    void setResult(HWND dlg, LONG_PTR value)
+    void fill(HDC dc, RECT rc, COLORREF color)
     {
-        SetWindowLongPtrW(dlg, DWLP_MSGRESULT, value);
+        HBRUSH brush = CreateSolidBrush(color);
+        FillRect(dc, &rc, brush);
+        DeleteObject(brush);
     }
 
-    bool confirmCancel(HWND dlg)
+    void hline(HDC dc, int x0, int x1, int y, COLORREF color)
     {
-        if (installing)
-            return false;
-        if (installed)
-            return true;
-        return MessageBoxW(dlg, L"Are you sure you want to quit Rave Setup?", kTitle, MB_YESNO | MB_ICONQUESTION) == IDYES;
+        fill(dc, { x0, y, x1, y + 1 }, color);
     }
 
-    INT_PTR CALLBACK welcomeProc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
+    void frame(HDC dc, RECT rc, COLORREF color)
     {
-        switch (msg)
-        {
-        case WM_INITDIALOG:
-            SendDlgItemMessageW(dlg, IDC_TITLE, WM_SETFONT, (WPARAM)titleFont, TRUE);
-            SetDlgItemTextW(dlg, IDC_TITLE, L"Welcome to Rave V" RAVE_VERSION_WSTR L" Setup");
-            SetDlgItemTextW(dlg, IDC_TEXT,
-                L"This wizard will guide you through the installation of Rave V" RAVE_VERSION_WSTR L".\r\n\r\n"
-                L"Rave is a Roblox launcher that always downloads and starts the latest Roblox version. "
-                L"Its built-in anticheat follows with Rave V0.2.\r\n\r\n"
-                L"It is recommended that you close all other applications before starting Setup.\r\n\r\n"
-                L"Click Next to continue.");
-            return TRUE;
-        case WM_NOTIFY:
-        {
-            NMHDR* n = (NMHDR*)lp;
-            if (n->code == PSN_SETACTIVE)
-            {
-                PropSheet_SetWizButtons(GetParent(dlg), PSWIZB_NEXT);
-                setResult(dlg, 0);
-                return TRUE;
-            }
-            if (n->code == PSN_QUERYCANCEL)
-            {
-                setResult(dlg, confirmCancel(dlg) ? FALSE : TRUE);
-                return TRUE;
-            }
-            break;
-        }
-        }
-        return FALSE;
+        hline(dc, rc.left, rc.right, rc.top, color);
+        hline(dc, rc.left, rc.right, rc.bottom - 1, color);
+        fill(dc, { rc.left, rc.top, rc.left + 1, rc.bottom }, color);
+        fill(dc, { rc.right - 1, rc.top, rc.right, rc.bottom }, color);
     }
 
-    void updateLicenseButtons(HWND dlg)
+    void text(HDC dc, HFONT font, COLORREF color, RECT rc, const std::wstring& str, UINT flags = DT_WORDBREAK)
     {
-        bool accepted = IsDlgButtonChecked(dlg, IDC_ACCEPT) == BST_CHECKED;
-        PropSheet_SetWizButtons(GetParent(dlg), PSWIZB_BACK | (accepted ? PSWIZB_NEXT : 0));
+        HGDIOBJ old = SelectObject(dc, font);
+        SetTextColor(dc, color);
+        SetBkMode(dc, TRANSPARENT);
+        DrawTextW(dc, str.c_str(), (int)str.size(), &rc, flags | DT_NOPREFIX);
+        SelectObject(dc, old);
     }
 
-    INT_PTR CALLBACK licenseProc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
+    RECT R(int x, int y, int w, int h)
     {
-        switch (msg)
-        {
-        case WM_INITDIALOG:
-        {
-            Resource lic = loadResource(IDR_LICENSE);
-            std::string raw((const char*)lic.data, lic.size);
-            std::string text;
-            text.reserve(raw.size() + raw.size() / 20);
-            for (size_t i = 0; i < raw.size(); ++i)
-            {
-                if (raw[i] == '\n' && (i == 0 || raw[i - 1] != '\r'))
-                    text += '\r';
-                text += raw[i];
-            }
-            int n = MultiByteToWideChar(CP_UTF8, 0, text.data(), (int)text.size(), nullptr, 0);
-            std::wstring wide(n, L'\0');
-            MultiByteToWideChar(CP_UTF8, 0, text.data(), (int)text.size(), wide.data(), n);
-            SendDlgItemMessageW(dlg, IDC_LICENSE_TEXT, EM_SETLIMITTEXT, 0, 0);
-            SetDlgItemTextW(dlg, IDC_LICENSE_TEXT, wide.c_str());
-            return TRUE;
-        }
-        case WM_COMMAND:
-            if (LOWORD(wp) == IDC_ACCEPT && HIWORD(wp) == BN_CLICKED)
-                updateLicenseButtons(dlg);
-            break;
-        case WM_NOTIFY:
-        {
-            NMHDR* n = (NMHDR*)lp;
-            if (n->code == PSN_SETACTIVE)
-            {
-                updateLicenseButtons(dlg);
-                setResult(dlg, 0);
-                return TRUE;
-            }
-            if (n->code == PSN_QUERYCANCEL)
-            {
-                setResult(dlg, confirmCancel(dlg) ? FALSE : TRUE);
-                return TRUE;
-            }
-            break;
-        }
-        }
-        return FALSE;
+        return { S(x), S(y), S(x + w), S(y + h) };
     }
 
-    void updateSpace(HWND dlg)
+    void paint(HDC dc)
+    {
+        RECT client;
+        GetClientRect(mainWindow, &client);
+        fill(dc, client, theme.content);
+
+        if (exteriorPage())
+        {
+            fill(dc, { 0, 0, client.right, S(kBand) }, theme.panel);
+            if (watermark)
+            {
+                HDC mem = CreateCompatibleDC(dc);
+                HGDIOBJ old = SelectObject(mem, watermark);
+                BitBlt(dc, 0, 0, S(kWatermark), S(kBand), mem, 0, 0, SRCCOPY);
+                SelectObject(mem, old);
+                DeleteDC(mem);
+            }
+
+            if (page == PageWelcome)
+            {
+                text(dc, titleFont, theme.text, R(176, 16, 312, 50), L"Welcome to Rave V" RAVE_VERSION_WSTR L" Setup");
+                text(dc, bodyFont, theme.text, R(176, 70, 312, 250),
+                    L"This wizard will guide you through the installation of Rave V" RAVE_VERSION_WSTR L".\r\n\r\n"
+                    L"Rave is a Roblox launcher that always downloads and starts the latest Roblox version. "
+                    L"Its built-in anticheat follows with Rave V0.2.\r\n\r\n"
+                    L"It is recommended that you close all other applications before starting Setup.\r\n\r\n"
+                    L"Click Next to continue.");
+            }
+            else
+            {
+                text(dc, titleFont, theme.text, R(176, 16, 312, 50), L"Completing Rave V" RAVE_VERSION_WSTR L" Setup");
+                text(dc, bodyFont, theme.text, R(176, 70, 312, 120),
+                    L"Rave V" RAVE_VERSION_WSTR L" has been installed on your computer.\r\n\r\nClick Finish to close Setup.");
+            }
+        }
+        else
+        {
+            fill(dc, { 0, 0, client.right, S(kHeader) }, theme.panel);
+            hline(dc, 0, client.right, S(kHeader), theme.line);
+            hline(dc, 0, client.right, S(kHeader) + 1, theme.lineLight);
+
+            const wchar_t* title = L"";
+            std::wstring subtitle;
+            switch (page)
+            {
+            case PageLicense: title = L"License Agreement"; subtitle = L"Please review the license terms before installing Rave V" RAVE_VERSION_WSTR L"."; break;
+            case PageLocation: title = L"Choose Install Location"; subtitle = L"Choose the folder in which to install Rave V" RAVE_VERSION_WSTR L"."; break;
+            case PageOptions: title = L"Choose Additional Tasks"; subtitle = L"Which additional tasks should be performed?"; break;
+            case PageInstall: title = L"Installing"; subtitle = L"Please wait while Rave V" RAVE_VERSION_WSTR L" is being installed."; break;
+            }
+            text(dc, boldFont, theme.text, R(20, 11, 400, 18), title, DT_SINGLELINE);
+            text(dc, bodyFont, theme.subtext, R(34, 30, 390, 18), subtitle, DT_SINGLELINE | DT_END_ELLIPSIS);
+            if (headerIcon)
+                DrawIconEx(dc, S(kWidth - 49 - 8), S(4), headerIcon, S(49), S(49), 0, nullptr, DI_NORMAL);
+
+            if (page == PageLicense)
+            {
+                text(dc, bodyFont, theme.text, R(36, 70, 428, 18), L"Press Page Down to see the rest of the agreement.", DT_SINGLELINE);
+            }
+            else if (page == PageLocation)
+            {
+                text(dc, bodyFont, theme.text, R(36, 70, 428, 50), L"Setup will install Rave in the following folder. To install in a different folder, click Browse and select another folder. Click Next to continue.");
+
+                RECT group = R(36, 134, 428, 62);
+                frame(dc, group, theme.line);
+                HGDIOBJ old = SelectObject(dc, bodyFont);
+                SIZE size;
+                GetTextExtentPoint32W(dc, L"Destination Folder", 18, &size);
+                SelectObject(dc, old);
+                RECT label{ group.left + S(8), group.top - size.cy / 2, group.left + S(8) + size.cx + S(6), group.top + size.cy / 2 + 1 };
+                fill(dc, label, theme.content);
+                text(dc, bodyFont, theme.text, { label.left + S(3), label.top, label.right, label.bottom }, L"Destination Folder", DT_SINGLELINE);
+
+                text(dc, bodyFont, theme.text, R(36, 212, 428, 18), spaceRequired, DT_SINGLELINE);
+                text(dc, bodyFont, theme.text, R(36, 232, 428, 18), spaceAvailable, DT_SINGLELINE);
+            }
+            else if (page == PageOptions)
+            {
+                text(dc, bodyFont, theme.text, R(36, 70, 428, 40), L"Select the additional tasks you would like Setup to perform while installing Rave, then click Install.");
+            }
+            else if (page == PageInstall)
+            {
+                text(dc, bodyFont, theme.text, R(36, 70, 428, 18), status, DT_SINGLELINE | DT_END_ELLIPSIS);
+                RECT track = R(36, 92, 428, 16);
+                fill(dc, track, theme.track);
+                frame(dc, track, theme.trackBorder);
+                RECT bar = { track.left + 1, track.top + 1, track.left + 1 + (track.right - track.left - 2) * progress / 100, track.bottom - 1 };
+                if (bar.right > bar.left)
+                    fill(dc, bar, theme.accent);
+            }
+        }
+
+        hline(dc, 0, client.right, S(kBand), theme.line);
+        hline(dc, 0, client.right, S(kBand) + 1, theme.lineLight);
+    }
+
+    void updateSpace()
     {
         Resource payload = loadResource(IDR_PAYLOAD);
-        ULONGLONG required = (ULONGLONG)payload.size * 2;
-        SetDlgItemTextW(dlg, IDC_SPACE_REQUIRED, (L"Space required: " + formatSize(required)).c_str());
+        spaceRequired = L"Space required: " + formatSize((ULONGLONG)payload.size * 2);
 
         wchar_t path[MAX_PATH * 2]{};
-        GetDlgItemTextW(dlg, IDC_PATH, path, MAX_PATH * 2);
+        GetWindowTextW(pathEdit, path, MAX_PATH * 2);
         std::wstring probe = path;
         ULARGE_INTEGER freeBytes{};
         bool found = false;
@@ -491,10 +680,12 @@ namespace
                 break;
             probe.resize(slash);
         }
-        SetDlgItemTextW(dlg, IDC_SPACE_AVAILABLE, found ? (L"Space available: " + formatSize(freeBytes.QuadPart)).c_str() : L"Space available: unknown");
+        spaceAvailable = found ? L"Space available: " + formatSize(freeBytes.QuadPart) : L"Space available: unknown";
+        RECT rc = R(36, 210, 428, 44);
+        InvalidateRect(mainWindow, &rc, FALSE);
     }
 
-    void browse(HWND dlg)
+    void browse()
     {
         ComPtr<IFileOpenDialog> picker;
         if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&picker))))
@@ -503,7 +694,7 @@ namespace
         picker->GetOptions(&options);
         picker->SetOptions(options | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST);
         picker->SetTitle(L"Select the folder to install Rave in");
-        if (FAILED(picker->Show(GetParent(dlg))))
+        if (FAILED(picker->Show(mainWindow)))
             return;
         ComPtr<IShellItem> item;
         if (FAILED(picker->GetResult(&item)))
@@ -519,128 +710,243 @@ namespace
         std::wstring leaf = slash == std::wstring::npos ? chosen : chosen.substr(slash + 1);
         if (_wcsicmp(leaf.c_str(), L"Rave") != 0)
             chosen += L"\\Rave";
-        SetDlgItemTextW(dlg, IDC_PATH, chosen.c_str());
+        SetWindowTextW(pathEdit, chosen.c_str());
     }
 
-    INT_PTR CALLBACK locationProc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
+    bool isChecked(HWND check)
+    {
+        return SendMessageW(check, BM_GETCHECK, 0, 0) == BST_CHECKED;
+    }
+
+    LRESULT CALLBACK checkProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     {
         switch (msg)
         {
-        case WM_INITDIALOG:
-            SetDlgItemTextW(dlg, IDC_PATH, defaultDir().c_str());
-            updateSpace(dlg);
-            return TRUE;
-        case WM_COMMAND:
-            if (LOWORD(wp) == IDC_BROWSE && HIWORD(wp) == BN_CLICKED)
-                browse(dlg);
-            if (LOWORD(wp) == IDC_PATH && HIWORD(wp) == EN_CHANGE)
-                updateSpace(dlg);
-            break;
-        case WM_NOTIFY:
+        case BM_GETCHECK:
+            return (GetWindowLongPtrW(hwnd, GWLP_USERDATA) & 1) ? BST_CHECKED : BST_UNCHECKED;
+        case BM_SETCHECK:
+            SetWindowLongPtrW(hwnd, GWLP_USERDATA, wp == BST_CHECKED ? 1 : 0);
+            InvalidateRect(hwnd, nullptr, FALSE);
+            return 0;
+        case WM_GETDLGCODE:
+            return DLGC_BUTTON;
+        case WM_SETFOCUS:
+        case WM_KILLFOCUS:
+        case WM_ENABLE:
+        case WM_SETTEXT:
         {
-            NMHDR* n = (NMHDR*)lp;
-            if (n->code == PSN_SETACTIVE)
+            LRESULT r = DefWindowProcW(hwnd, msg, wp, lp);
+            InvalidateRect(hwnd, nullptr, FALSE);
+            return r;
+        }
+        case WM_LBUTTONDOWN:
+            SetFocus(hwnd);
+            SetCapture(hwnd);
+            return 0;
+        case WM_LBUTTONUP:
+        {
+            if (GetCapture() != hwnd)
+                return 0;
+            ReleaseCapture();
+            RECT rc;
+            GetClientRect(hwnd, &rc);
+            POINT pt{ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) };
+            if (!PtInRect(&rc, pt))
+                return 0;
+        }
+            [[fallthrough]];
+        case WM_USER:
+            SetWindowLongPtrW(hwnd, GWLP_USERDATA, (GetWindowLongPtrW(hwnd, GWLP_USERDATA) & 1) ^ 1);
+            InvalidateRect(hwnd, nullptr, FALSE);
+            SendMessageW(GetParent(hwnd), WM_COMMAND, MAKEWPARAM(GetDlgCtrlID(hwnd), BN_CLICKED), (LPARAM)hwnd);
+            return 0;
+        case WM_KEYUP:
+            if (wp == VK_SPACE)
+                SendMessageW(hwnd, WM_USER, 0, 0);
+            return 0;
+        case WM_ERASEBKGND:
+            return 1;
+        case WM_PAINT:
+        {
+            PAINTSTRUCT ps;
+            HDC target = BeginPaint(hwnd, &ps);
+            RECT rc;
+            GetClientRect(hwnd, &rc);
+            HDC dc = CreateCompatibleDC(target);
+            HBITMAP bmp = CreateCompatibleBitmap(target, rc.right, rc.bottom);
+            HGDIOBJ oldBmp = SelectObject(dc, bmp);
+
+            fill(dc, rc, backgroundAt(hwnd));
+            bool checked = (GetWindowLongPtrW(hwnd, GWLP_USERDATA) & 1) != 0;
+            int box = S(14);
+            RECT boxRc{ 0, (rc.bottom - box) / 2, box, (rc.bottom - box) / 2 + box };
+            if (checked)
             {
-                PropSheet_SetWizButtons(GetParent(dlg), PSWIZB_BACK | PSWIZB_NEXT);
-                setResult(dlg, 0);
-                return TRUE;
+                fill(dc, boxRc, theme.accent);
+                HPEN pen = CreatePen(PS_SOLID, std::max(1, S(2)), theme.check);
+                HGDIOBJ oldPen = SelectObject(dc, pen);
+                MoveToEx(dc, boxRc.left + box * 3 / 14, boxRc.top + box * 7 / 14, nullptr);
+                LineTo(dc, boxRc.left + box * 6 / 14, boxRc.top + box * 10 / 14);
+                LineTo(dc, boxRc.left + box * 11 / 14, boxRc.top + box * 4 / 14);
+                SelectObject(dc, oldPen);
+                DeleteObject(pen);
             }
-            if (n->code == PSN_WIZNEXT)
+            else
             {
-                wchar_t path[MAX_PATH * 2]{};
-                GetDlgItemTextW(dlg, IDC_PATH, path, MAX_PATH * 2);
-                std::wstring dir = path;
-                while (!dir.empty() && (dir.back() == L'\\' || dir.back() == L' '))
-                    dir.pop_back();
-                if (dir.size() < 3 || PathIsRelativeW(dir.c_str()) || dir.find_first_of(L"*?\"<>|") != std::wstring::npos || PathIsRootW(dir.c_str()))
-                {
-                    MessageBoxW(dlg, L"Please choose a valid folder to install Rave in.", kTitle, MB_OK | MB_ICONWARNING);
-                    setResult(dlg, -1);
-                    return TRUE;
-                }
-                installDir = dir;
-                setResult(dlg, 0);
-                return TRUE;
+                fill(dc, boxRc, theme.field);
+                frame(dc, boxRc, theme.boxBorder);
             }
-            if (n->code == PSN_QUERYCANCEL)
+
+            wchar_t label[256]{};
+            GetWindowTextW(hwnd, label, 256);
+            HFONT font = (HFONT)SendMessageW(GetParent(hwnd), WM_GETFONT, 0, 0);
+            if (!font)
+                font = bodyFont;
+            RECT textRc{ box + S(8), 0, rc.right, rc.bottom };
+            HGDIOBJ oldFont = SelectObject(dc, font);
+            SetBkMode(dc, TRANSPARENT);
+            SetTextColor(dc, IsWindowEnabled(hwnd) ? theme.text : theme.line);
+            DrawTextW(dc, label, -1, &textRc, DT_SINGLELINE | DT_VCENTER);
+            if (GetFocus() == hwnd)
             {
-                setResult(dlg, confirmCancel(dlg) ? FALSE : TRUE);
-                return TRUE;
+                RECT measure = textRc;
+                DrawTextW(dc, label, -1, &measure, DT_SINGLELINE | DT_VCENTER | DT_CALCRECT);
+                int h = measure.bottom - measure.top;
+                RECT focus{ textRc.left - S(2), (rc.bottom - h) / 2 - 1, measure.right + S(2), (rc.bottom + h) / 2 + 1 };
+                SetTextColor(dc, theme.text);
+                DrawFocusRect(dc, &focus);
             }
-            break;
+            SelectObject(dc, oldFont);
+
+            BitBlt(target, 0, 0, rc.right, rc.bottom, dc, 0, 0, SRCCOPY);
+            SelectObject(dc, oldBmp);
+            DeleteObject(bmp);
+            DeleteDC(dc);
+            EndPaint(hwnd, &ps);
+            return 0;
         }
         }
-        return FALSE;
+        return DefWindowProcW(hwnd, msg, wp, lp);
     }
 
-    INT_PTR CALLBACK optionsProc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
+    LRESULT CALLBACK licenseSubclass(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR, DWORD_PTR)
     {
-        switch (msg)
-        {
-        case WM_INITDIALOG:
-            CheckDlgButton(dlg, IDC_STARTMENU, BST_CHECKED);
-            CheckDlgButton(dlg, IDC_DESKTOP, BST_CHECKED);
-            return TRUE;
-        case WM_NOTIFY:
-        {
-            NMHDR* n = (NMHDR*)lp;
-            if (n->code == PSN_SETACTIVE)
-            {
-                PropSheet_SetWizButtons(GetParent(dlg), PSWIZB_BACK | PSWIZB_NEXT);
-                PropSheet_SetButtonText(GetParent(dlg), PSWIZB_NEXT, L"&Install");
-                setResult(dlg, 0);
-                return TRUE;
-            }
-            if (n->code == PSN_KILLACTIVE)
-            {
-                PropSheet_SetButtonText(GetParent(dlg), PSWIZB_NEXT, L"&Next >");
-                break;
-            }
-            if (n->code == PSN_WIZNEXT)
-            {
-                startMenu = IsDlgButtonChecked(dlg, IDC_STARTMENU) == BST_CHECKED;
-                desktop = IsDlgButtonChecked(dlg, IDC_DESKTOP) == BST_CHECKED;
-                PropSheet_SetButtonText(GetParent(dlg), PSWIZB_NEXT, L"&Next >");
-                setResult(dlg, 0);
-                return TRUE;
-            }
-            if (n->code == PSN_QUERYCANCEL)
-            {
-                setResult(dlg, confirmCancel(dlg) ? FALSE : TRUE);
-                return TRUE;
-            }
-            break;
-        }
-        }
-        return FALSE;
+        if (msg == WM_GETDLGCODE)
+            return DefSubclassProc(hwnd, msg, wp, lp) & ~DLGC_HASSETSEL;
+        return DefSubclassProc(hwnd, msg, wp, lp);
     }
 
-    void post(HWND dlg, UINT msg, const std::wstring& text, WPARAM value = 0)
+    HWND makeControl(const wchar_t* cls, const wchar_t* label, DWORD style, DWORD exStyle, int id, RECT rc)
     {
-        std::wstring* copy = new std::wstring(text);
-        if (!PostMessageW(dlg, msg, value, (LPARAM)copy))
+        HWND hwnd = CreateWindowExW(exStyle, cls, label, WS_CHILD | style, rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top, mainWindow, (HMENU)(INT_PTR)id, instance, nullptr);
+        SendMessageW(hwnd, WM_SETFONT, (WPARAM)bodyFont, TRUE);
+        return hwnd;
+    }
+
+    void loadLicense()
+    {
+        Resource lic = loadResource(IDR_LICENSE);
+        std::string raw((const char*)lic.data, lic.size);
+        std::string body;
+        body.reserve(raw.size() + raw.size() / 20);
+        for (size_t i = 0; i < raw.size(); ++i)
+        {
+            if (raw[i] == '\n' && (i == 0 || raw[i - 1] != '\r'))
+                body += '\r';
+            body += raw[i];
+        }
+        int n = MultiByteToWideChar(CP_UTF8, 0, body.data(), (int)body.size(), nullptr, 0);
+        std::wstring wide(n, L'\0');
+        MultiByteToWideChar(CP_UTF8, 0, body.data(), (int)body.size(), wide.data(), n);
+        SendMessageW(licenseEdit, EM_SETLIMITTEXT, 0, 0);
+        SetWindowTextW(licenseEdit, wide.c_str());
+        SendMessageW(licenseEdit, EM_SETSEL, 0, 0);
+    }
+
+    void createControls()
+    {
+        licenseEdit = makeControl(L"EDIT", L"", ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL | WS_TABSTOP, WS_EX_CLIENTEDGE, ID_LICENSE, R(36, 90, 428, 192));
+        SetWindowSubclass(licenseEdit, licenseSubclass, 1, 0);
+        acceptCheck = makeControl(kCheckClass, L"I accept the terms of the License Agreement", WS_TABSTOP, 0, ID_ACCEPT, R(36, 292, 428, 22));
+
+        pathEdit = makeControl(L"EDIT", L"", ES_AUTOHSCROLL | WS_TABSTOP, WS_EX_CLIENTEDGE, ID_PATH, R(50, 154, 310, 24));
+        browseButton = makeControl(L"BUTTON", L"B&rowse...", BS_PUSHBUTTON | WS_TABSTOP, 0, ID_BROWSE, R(370, 153, 82, 26));
+
+        startMenuCheck = makeControl(kCheckClass, L"Create a Start Menu shortcut", WS_TABSTOP, 0, ID_STARTMENU, R(48, 116, 400, 22));
+        desktopCheck = makeControl(kCheckClass, L"Create a Desktop shortcut", WS_TABSTOP, 0, ID_DESKTOP, R(48, 142, 400, 22));
+        SendMessageW(startMenuCheck, BM_SETCHECK, BST_CHECKED, 0);
+        SendMessageW(desktopCheck, BM_SETCHECK, BST_CHECKED, 0);
+
+        detailsList = makeControl(L"LISTBOX", L"", LBS_NOINTEGRALHEIGHT | LBS_NOSEL | WS_VSCROLL, WS_EX_CLIENTEDGE, ID_DETAILS, R(36, 118, 428, 206));
+
+        launchCheck = makeControl(kCheckClass, L"Launch Rave V" RAVE_VERSION_WSTR, WS_TABSTOP, 0, ID_LAUNCH, R(176, 200, 300, 22));
+        SendMessageW(launchCheck, BM_SETCHECK, BST_CHECKED, 0);
+
+        backButton = makeControl(L"BUTTON", L"< &Back", BS_PUSHBUTTON | WS_TABSTOP | WS_VISIBLE, 0, ID_BACK, R(257, 351, 75, 23));
+        nextButton = makeControl(L"BUTTON", L"&Next >", BS_DEFPUSHBUTTON | WS_TABSTOP | WS_VISIBLE, 0, ID_NEXT, R(332, 351, 75, 23));
+        cancelButton = makeControl(L"BUTTON", L"Cancel", BS_PUSHBUTTON | WS_TABSTOP | WS_VISIBLE, 0, ID_CANCEL, R(414, 351, 75, 23));
+
+        loadLicense();
+        SetWindowTextW(pathEdit, defaultDir().c_str());
+        updateSpace();
+    }
+
+    void showPage(int next)
+    {
+        page = next;
+        auto show = [](HWND hwnd, bool visible) { ShowWindow(hwnd, visible ? SW_SHOW : SW_HIDE); };
+        show(licenseEdit, page == PageLicense);
+        show(acceptCheck, page == PageLicense);
+        show(pathEdit, page == PageLocation);
+        show(browseButton, page == PageLocation);
+        show(startMenuCheck, page == PageOptions);
+        show(desktopCheck, page == PageOptions);
+        show(detailsList, page == PageInstall);
+        show(launchCheck, page == PageFinish);
+
+        EnableWindow(backButton, page == PageLicense || page == PageLocation || page == PageOptions);
+        EnableWindow(nextButton, page != PageInstall && (page != PageLicense || isChecked(acceptCheck)));
+        EnableWindow(cancelButton, page != PageInstall && page != PageFinish);
+        SetWindowTextW(nextButton, page == PageOptions ? L"&Install" : page == PageFinish ? L"&Finish" : L"&Next >");
+        SetWindowTextW(cancelButton, L"Cancel");
+
+        if (page == PageLicense)
+        {
+            SetFocus(licenseEdit);
+            SendMessageW(licenseEdit, EM_SETSEL, 0, 0);
+        }
+        else if (page == PageLocation)
+            SetFocus(pathEdit);
+        else if (IsWindowEnabled(nextButton))
+            SetFocus(nextButton);
+
+        RedrawWindow(mainWindow, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
+    }
+
+    void post(UINT msg, const std::wstring& str, WPARAM value)
+    {
+        std::wstring* copy = new std::wstring(str);
+        if (!PostMessageW(mainWindow, msg, value, (LPARAM)copy))
             delete copy;
     }
 
-    void installWorker(HWND dlg)
+    void installWorker()
     {
         CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-        auto status = [&](const std::wstring& text, int percent) {
-            post(dlg, WM_INSTALL_STATUS, text, (WPARAM)percent);
-        };
-        auto fail = [&](const std::wstring& text) {
-            post(dlg, WM_INSTALL_DONE, text, 0);
+        auto step = [](const std::wstring& str, int percent) { post(WM_INSTALL_STATUS, str, (WPARAM)percent); };
+        auto fail = [](const std::wstring& str) {
+            post(WM_INSTALL_DONE, str, 0);
             CoUninitialize();
         };
 
-        status(L"Checking for a running Rave...", 5);
-        if (!closeRave(GetParent(dlg)))
+        step(L"Checking for a running Rave...", 5);
+        if (!closeRave(mainWindow))
         {
             fail(L"Setup was cancelled because Rave is still running.");
             return;
         }
 
-        status(L"Create folder: " + installDir, 15);
+        step(L"Create folder: " + installDir, 15);
         if (!ensureDir(installDir))
         {
             fail(L"Could not create the folder:\r\n" + installDir);
@@ -649,7 +955,7 @@ namespace
 
         Resource payload = loadResource(IDR_PAYLOAD);
         std::wstring exe = installDir + L"\\Rave.exe";
-        status(L"Extract: Rave.exe", 35);
+        step(L"Extract: Rave.exe", 35);
         if (!payload.data || !writeFile(exe, payload.data, payload.size))
         {
             fail(L"Could not write:\r\n" + exe);
@@ -657,14 +963,14 @@ namespace
         }
 
         std::wstring uninstaller = installDir + L"\\uninstall.exe";
-        status(L"Create uninstaller: uninstall.exe", 60);
+        step(L"Create uninstaller: uninstall.exe", 60);
         if (!CopyFileW(selfPath().c_str(), uninstaller.c_str(), FALSE))
         {
             fail(L"Could not write:\r\n" + uninstaller);
             return;
         }
 
-        status(L"Create shortcuts", 75);
+        step(L"Create shortcuts", 75);
         if (startMenu)
             createShortcut(startMenuShortcut(), exe, installDir);
         else
@@ -674,14 +980,14 @@ namespace
         else
             DeleteFileW(desktopShortcut().c_str());
 
-        status(L"Register Rave in Apps and Features", 90);
+        step(L"Register Rave in Apps and Features", 90);
         HKEY key;
         if (RegCreateKeyExW(HKEY_LOCAL_MACHINE, kUninstallKey, 0, nullptr, 0, KEY_WRITE | KEY_WOW64_64KEY, nullptr, &key, nullptr) == ERROR_SUCCESS)
         {
             regWrite(key, L"DisplayName", L"Rave");
             regWrite(key, L"DisplayVersion", RAVE_VERSION_WSTR);
             regWrite(key, L"Publisher", RAVE_PUBLISHER);
-            regWrite(key, L"DisplayIcon", exe);
+            regWrite(key, L"DisplayIcon", exe + L",0");
             regWrite(key, L"InstallLocation", installDir);
             regWrite(key, L"UninstallString", L"\"" + uninstaller + L"\"");
             regWrite(key, L"QuietUninstallString", L"\"" + uninstaller + L"\"");
@@ -700,188 +1006,276 @@ namespace
         }
 
         SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
-        status(L"Completed", 100);
-        post(dlg, WM_INSTALL_DONE, L"", 1);
+        step(L"Completed", 100);
+        post(WM_INSTALL_DONE, L"", 1);
         CoUninitialize();
     }
 
-    INT_PTR CALLBACK installProc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
+    bool validateLocation()
+    {
+        wchar_t path[MAX_PATH * 2]{};
+        GetWindowTextW(pathEdit, path, MAX_PATH * 2);
+        std::wstring dir = path;
+        while (!dir.empty() && (dir.back() == L'\\' || dir.back() == L' '))
+            dir.pop_back();
+        if (dir.size() < 3 || PathIsRelativeW(dir.c_str()) || dir.find_first_of(L"*?\"<>|") != std::wstring::npos || PathIsRootW(dir.c_str()))
+        {
+            MessageBoxW(mainWindow, L"Please choose a valid folder to install Rave in.", kTitle, MB_OK | MB_ICONWARNING);
+            return false;
+        }
+        installDir = dir;
+        return true;
+    }
+
+    void finish()
+    {
+        bool launch = isChecked(launchCheck);
+        DestroyWindow(mainWindow);
+        if (launch)
+            launchRave();
+    }
+
+    void cancel()
+    {
+        if (installing)
+        {
+            MessageBeep(MB_OK);
+            return;
+        }
+        if (page == PageFinish)
+        {
+            finish();
+            return;
+        }
+        if (failed || MessageBoxW(mainWindow, L"Are you sure you want to quit Rave Setup?", kTitle, MB_YESNO | MB_ICONQUESTION) == IDYES)
+            DestroyWindow(mainWindow);
+    }
+
+    void onCommand(int id, int code)
+    {
+        switch (id)
+        {
+        case ID_NEXT:
+            if (!IsWindowEnabled(nextButton))
+                return;
+            if (page == PageWelcome)
+                showPage(PageLicense);
+            else if (page == PageLicense && isChecked(acceptCheck))
+                showPage(PageLocation);
+            else if (page == PageLocation && validateLocation())
+                showPage(PageOptions);
+            else if (page == PageOptions)
+            {
+                startMenu = isChecked(startMenuCheck);
+                desktop = isChecked(desktopCheck);
+                installing = true;
+                progress = 0;
+                status = L"Preparing...";
+                showPage(PageInstall);
+                std::thread(installWorker).detach();
+            }
+            else if (page == PageFinish)
+                finish();
+            break;
+        case ID_BACK:
+            if (!IsWindowEnabled(backButton))
+                return;
+            if (page == PageLicense || page == PageLocation || page == PageOptions)
+                showPage(page - 1);
+            break;
+        case ID_CANCEL:
+            cancel();
+            break;
+        case ID_ACCEPT:
+            if (code == BN_CLICKED)
+                EnableWindow(nextButton, isChecked(acceptCheck));
+            break;
+        case ID_BROWSE:
+            if (code == BN_CLICKED)
+                browse();
+            break;
+        case ID_PATH:
+            if (code == EN_CHANGE)
+                updateSpace();
+            break;
+        }
+    }
+
+    LRESULT CALLBACK windowProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     {
         switch (msg)
         {
-        case WM_INITDIALOG:
-            SendDlgItemMessageW(dlg, IDC_PROGRESS, PBM_SETRANGE, 0, MAKELPARAM(0, 100));
-            return TRUE;
+        case WM_CREATE:
+            mainWindow = hwnd;
+            createControls();
+            applyTheme();
+            showPage(PageWelcome);
+            return 0;
+        case WM_GETFONT:
+            return (LRESULT)bodyFont;
+        case DM_GETDEFID:
+            return MAKELRESULT(ID_NEXT, DC_HASDEFID);
+        case WM_ERASEBKGND:
+            return 1;
+        case WM_PAINT:
+        {
+            PAINTSTRUCT ps;
+            HDC target = BeginPaint(hwnd, &ps);
+            RECT rc;
+            GetClientRect(hwnd, &rc);
+            HDC dc = CreateCompatibleDC(target);
+            HBITMAP bmp = CreateCompatibleBitmap(target, rc.right, rc.bottom);
+            HGDIOBJ old = SelectObject(dc, bmp);
+            paint(dc);
+            BitBlt(target, 0, 0, rc.right, rc.bottom, dc, 0, 0, SRCCOPY);
+            SelectObject(dc, old);
+            DeleteObject(bmp);
+            DeleteDC(dc);
+            EndPaint(hwnd, &ps);
+            return 0;
+        }
+        case WM_PRINTCLIENT:
+            paint((HDC)wp);
+            return 0;
+        case WM_CTLCOLOREDIT:
+        case WM_CTLCOLORLISTBOX:
+        case WM_CTLCOLORSTATIC:
+        {
+            HDC dc = (HDC)wp;
+            SetTextColor(dc, theme.fieldText);
+            SetBkColor(dc, theme.field);
+            return (LRESULT)theme.fieldBrush;
+        }
+        case WM_CTLCOLORBTN:
+            return (LRESULT)theme.contentBrush;
+        case WM_COMMAND:
+            onCommand(LOWORD(wp), HIWORD(wp));
+            return 0;
         case WM_INSTALL_STATUS:
         {
-            std::wstring* text = (std::wstring*)lp;
-            SetDlgItemTextW(dlg, IDC_STATUS, text->c_str());
-            LRESULT index = SendDlgItemMessageW(dlg, IDC_DETAILS, LB_ADDSTRING, 0, (LPARAM)text->c_str());
-            SendDlgItemMessageW(dlg, IDC_DETAILS, LB_SETTOPINDEX, (WPARAM)index, 0);
-            SendDlgItemMessageW(dlg, IDC_PROGRESS, PBM_SETPOS, wp, 0);
-            delete text;
-            return TRUE;
+            std::wstring* str = (std::wstring*)lp;
+            status = *str;
+            progress = (int)wp;
+            LRESULT index = SendMessageW(detailsList, LB_ADDSTRING, 0, (LPARAM)str->c_str());
+            SendMessageW(detailsList, LB_SETTOPINDEX, (WPARAM)index, 0);
+            RECT rc = R(36, 66, 428, 46);
+            InvalidateRect(hwnd, &rc, FALSE);
+            delete str;
+            return 0;
         }
         case WM_INSTALL_DONE:
         {
-            std::wstring* text = (std::wstring*)lp;
+            std::wstring* str = (std::wstring*)lp;
             installing = false;
             if (wp)
             {
                 installed = true;
-                PropSheet_SetWizButtons(GetParent(dlg), PSWIZB_NEXT);
-                PropSheet_PressButton(GetParent(dlg), PSBTN_NEXT);
+                showPage(PageFinish);
             }
             else
             {
-                SetDlgItemTextW(dlg, IDC_STATUS, L"Installation failed");
-                SendDlgItemMessageW(dlg, IDC_DETAILS, LB_ADDSTRING, 0, (LPARAM)text->c_str());
-                EnableWindow(GetDlgItem(GetParent(dlg), IDCANCEL), TRUE);
-                PropSheet_SetWizButtons(GetParent(dlg), 0);
-                MessageBoxW(dlg, text->c_str(), kTitle, MB_OK | MB_ICONERROR);
+                failed = true;
+                status = L"Installation failed";
+                SendMessageW(detailsList, LB_ADDSTRING, 0, (LPARAM)str->c_str());
+                EnableWindow(cancelButton, TRUE);
+                SetWindowTextW(cancelButton, L"&Close");
+                InvalidateRect(hwnd, nullptr, FALSE);
+                MessageBoxW(hwnd, str->c_str(), kTitle, MB_OK | MB_ICONERROR);
             }
-            delete text;
-            return TRUE;
+            delete str;
+            return 0;
         }
-        case WM_NOTIFY:
-        {
-            NMHDR* n = (NMHDR*)lp;
-            if (n->code == PSN_SETACTIVE)
-            {
-                if (installed)
-                {
-                    setResult(dlg, -1);
-                    return TRUE;
-                }
-                PropSheet_SetWizButtons(GetParent(dlg), 0);
-                EnableWindow(GetDlgItem(GetParent(dlg), IDCANCEL), FALSE);
-                installing = true;
-                std::thread(installWorker, dlg).detach();
-                setResult(dlg, 0);
-                return TRUE;
-            }
-            if (n->code == PSN_WIZBACK)
-            {
-                setResult(dlg, -1);
-                return TRUE;
-            }
-            if (n->code == PSN_QUERYCANCEL)
-            {
-                setResult(dlg, confirmCancel(dlg) ? FALSE : TRUE);
-                return TRUE;
-            }
+        case WM_SETTINGCHANGE:
+            if (lp && lstrcmpiW((LPCWSTR)lp, L"ImmersiveColorSet") == 0)
+                applyTheme();
             break;
-        }
-        }
-        return FALSE;
-    }
-
-    INT_PTR CALLBACK finishProc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
-    {
-        switch (msg)
-        {
-        case WM_INITDIALOG:
-            SendDlgItemMessageW(dlg, IDC_TITLE, WM_SETFONT, (WPARAM)titleFont, TRUE);
-            SetDlgItemTextW(dlg, IDC_TITLE, L"Completing Rave V" RAVE_VERSION_WSTR L" Setup");
-            SetDlgItemTextW(dlg, IDC_TEXT, L"Rave V" RAVE_VERSION_WSTR L" has been installed on your computer.\r\n\r\nClick Finish to close Setup.");
-            SetDlgItemTextW(dlg, IDC_LAUNCH, L"&Launch Rave V" RAVE_VERSION_WSTR);
-            CheckDlgButton(dlg, IDC_LAUNCH, BST_CHECKED);
-            return TRUE;
-        case WM_NOTIFY:
-        {
-            NMHDR* n = (NMHDR*)lp;
-            if (n->code == PSN_SETACTIVE)
-            {
-                PropSheet_SetWizButtons(GetParent(dlg), PSWIZB_FINISH);
-                EnableWindow(GetDlgItem(GetParent(dlg), IDCANCEL), FALSE);
-                setResult(dlg, 0);
-                return TRUE;
-            }
-            if (n->code == PSN_WIZFINISH)
-            {
-                launchAfter = IsDlgButtonChecked(dlg, IDC_LAUNCH) == BST_CHECKED;
-                setResult(dlg, 0);
-                return TRUE;
-            }
-            if (n->code == PSN_WIZBACK)
-            {
-                setResult(dlg, -1);
-                return TRUE;
-            }
+        case WM_THEMECHANGED:
+        case WM_SYSCOLORCHANGE:
+            applyTheme();
             break;
+        case WM_CLOSE:
+            cancel();
+            return 0;
+        case WM_DESTROY:
+            PostQuitMessage(0);
+            return 0;
         }
-        }
-        return FALSE;
+        return DefWindowProcW(hwnd, msg, wp, lp);
     }
 
-    int CALLBACK sheetCallback(HWND hwnd, UINT msg, LPARAM)
+    void createFonts()
     {
-        if (msg == PSCB_INITIALIZED)
-        {
-            sheet = hwnd;
-            SendMessageW(hwnd, WM_SETICON, ICON_BIG, (LPARAM)appIcon);
-            SendMessageW(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)appIconSmall);
-        }
-        return 0;
-    }
-
-    PROPSHEETPAGEW page(int id, DLGPROC proc, bool exterior, const wchar_t* title, const wchar_t* subtitle)
-    {
-        PROPSHEETPAGEW p{};
-        p.dwSize = sizeof(p);
-        p.hInstance = instance;
-        p.pszTemplate = MAKEINTRESOURCEW(id);
-        p.pfnDlgProc = proc;
-        if (exterior)
-            p.dwFlags = PSP_HIDEHEADER;
-        else
-        {
-            p.dwFlags = PSP_USEHEADERTITLE | PSP_USEHEADERSUBTITLE;
-            p.pszHeaderTitle = title;
-            p.pszHeaderSubTitle = subtitle;
-        }
-        return p;
+        NONCLIENTMETRICSW ncm{};
+        ncm.cbSize = sizeof(ncm);
+        SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, sizeof(ncm), &ncm, 0);
+        LOGFONTW lf = ncm.lfMessageFont;
+        bodyFont = CreateFontIndirectW(&lf);
+        lf.lfWeight = FW_BOLD;
+        boldFont = CreateFontIndirectW(&lf);
+        titleFont = CreateFontW(-MulDiv(12, dpi, 72), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, lf.lfFaceName);
     }
 
     int runInstaller()
     {
-        UINT dpi = 96;
         HDC screen = GetDC(nullptr);
-        dpi = (UINT)GetDeviceCaps(screen, LOGPIXELSY);
+        dpi = GetDeviceCaps(screen, LOGPIXELSY);
         ReleaseDC(nullptr, screen);
 
-        titleFont = CreateFontW(-MulDiv(12, (int)dpi, 72), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Segoe UI");
-        HBITMAP watermark = makeBitmap(MulDiv(164, (int)dpi, 96), MulDiv(314, (int)dpi, 96), true);
-        HBITMAP header = makeBitmap(MulDiv(49, (int)dpi, 96), MulDiv(49, (int)dpi, 96), false);
+        initDarkModeSupport();
+        applyTheme();
+        createFonts();
+        watermark = makeWatermark(S(kWatermark), S(kBand));
+        headerIcon = (HICON)LoadImageW(instance, MAKEINTRESOURCEW(IDI_RAVE), IMAGE_ICON, S(49), S(49), 0);
 
-        PROPSHEETPAGEW pages[] = {
-            page(IDD_WELCOME, welcomeProc, true, nullptr, nullptr),
-            page(IDD_LICENSE, licenseProc, false, L"License Agreement", L"Please review the license terms before installing Rave V" RAVE_VERSION_WSTR L"."),
-            page(IDD_LOCATION, locationProc, false, L"Choose Install Location", L"Choose the folder in which to install Rave V" RAVE_VERSION_WSTR L"."),
-            page(IDD_OPTIONS, optionsProc, false, L"Choose Additional Tasks", L"Which additional tasks should be performed?"),
-            page(IDD_INSTALL, installProc, false, L"Installing", L"Please wait while Rave V" RAVE_VERSION_WSTR L" is being installed."),
-            page(IDD_FINISH, finishProc, true, nullptr, nullptr),
-        };
+        WNDCLASSEXW check{ sizeof(check) };
+        check.style = CS_HREDRAW | CS_VREDRAW;
+        check.lpfnWndProc = checkProc;
+        check.hInstance = instance;
+        check.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+        check.lpszClassName = kCheckClass;
+        RegisterClassExW(&check);
 
-        PROPSHEETHEADERW h{};
-        h.dwSize = sizeof(h);
-        h.dwFlags = PSH_WIZARD97 | PSH_PROPSHEETPAGE | PSH_WATERMARK | PSH_HEADER | PSH_USEHBMWATERMARK | PSH_USEHBMHEADER | PSH_USECALLBACK;
-        h.hInstance = instance;
-        h.hwndParent = nullptr;
-        h.pszCaption = kTitle;
-        h.nPages = (UINT)(sizeof(pages) / sizeof(pages[0]));
-        h.ppsp = pages;
-        h.hbmWatermark = watermark;
-        h.hbmHeader = header;
-        h.pfnCallback = sheetCallback;
+        WNDCLASSEXW wc{ sizeof(wc) };
+        wc.lpfnWndProc = windowProc;
+        wc.hInstance = instance;
+        wc.hIcon = appIcon;
+        wc.hIconSm = appIconSmall;
+        wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+        wc.lpszClassName = kWindowClass;
+        RegisterClassExW(&wc);
 
-        PropertySheetW(&h);
+        DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_CLIPCHILDREN;
+        DWORD exStyle = WS_EX_CONTROLPARENT;
+        RECT rc{ 0, 0, S(kWidth), S(kHeight) };
+        AdjustWindowRectEx(&rc, style, FALSE, exStyle);
+        int w = rc.right - rc.left, h = rc.bottom - rc.top;
 
-        if (installed && launchAfter)
-            launchRave();
+        RECT work{};
+        SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
+        int x = work.left + (work.right - work.left - w) / 2;
+        int y = work.top + (work.bottom - work.top - h) / 2;
+
+        HWND hwnd = CreateWindowExW(exStyle, kWindowClass, kTitle, style, x, y, w, h, nullptr, nullptr, instance, nullptr);
+        if (!hwnd)
+            return 1;
+        SendMessageW(hwnd, WM_SETICON, ICON_BIG, (LPARAM)appIcon);
+        SendMessageW(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)appIconSmall);
+        ShowWindow(hwnd, SW_SHOWNORMAL);
+        UpdateWindow(hwnd);
+
+        MSG msg;
+        while (GetMessageW(&msg, nullptr, 0, 0) > 0)
+        {
+            if (!IsDialogMessageW(mainWindow, &msg))
+            {
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+        }
 
         DeleteObject(watermark);
-        DeleteObject(header);
+        DeleteObject(bodyFont);
+        DeleteObject(boldFont);
         DeleteObject(titleFont);
         return installed ? 0 : 1;
     }
@@ -908,7 +1302,7 @@ namespace
         std::wstring data = knownFolder(FOLDERID_LocalAppData) + L"\\Rave";
         if (GetFileAttributesW(data.c_str()) != INVALID_FILE_ATTRIBUTES)
         {
-            std::wstring question = L"Do you also want to remove the Rave user data?\n\nThis deletes the Roblox versions Rave downloaded in:\n" + data;
+            std::wstring question = L"Do you also want to remove the Rave user data?\n\nThis deletes the Roblox versions and FFlags Rave saved in:\n" + data;
             if (MessageBoxW(nullptr, question.c_str(), L"Rave Uninstall", MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) == IDYES)
                 removeTree(data);
         }
@@ -921,7 +1315,7 @@ namespace
     int startUninstall()
     {
         std::wstring self = selfPath();
-        std::wstring dir = regRead(kAppKey, L"InstallPath");
+        std::wstring dir = regRead(HKEY_LOCAL_MACHINE, kAppKey, L"InstallPath");
         if (dir.empty())
             dir = self.substr(0, self.find_last_of(L'\\'));
 
@@ -951,10 +1345,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int)
     instance = hInstance;
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
-    INITCOMMONCONTROLSEX icc{ sizeof(icc), ICC_PROGRESS_CLASS | ICC_STANDARD_CLASSES };
+    INITCOMMONCONTROLSEX icc{ sizeof(icc), ICC_STANDARD_CLASSES };
     InitCommonControlsEx(&icc);
     appIcon = (HICON)LoadImageW(hInstance, MAKEINTRESOURCEW(IDI_LOGO), IMAGE_ICON, GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON), LR_DEFAULTCOLOR);
-    appIconSmall = (HICON)LoadImageW(hInstance, MAKEINTRESOURCEW(IDI_LOGO), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR);
+    appIconSmall = (HICON)LoadImageW(hInstance, MAKEINTRESOURCEW(IDI_RAVE), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR);
 
     int argc = 0;
     LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);

@@ -19,5 +19,4 @@ namespace roblox
     void removeOldVersions(const std::string& keepGuid);
     bool launch(const std::string& guid, std::string& error);
     bool isRunning();
-    int close();
 }

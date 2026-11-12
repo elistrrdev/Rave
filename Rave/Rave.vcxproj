@@ -99,6 +99,7 @@
     <ClCompile Include="custom\logs.cpp" />
     <ClCompile Include="custom\misc.cpp" />
     <ClCompile Include="custom\tab.cpp" />
+    <ClCompile Include="core\fflags.cpp" />
     <ClCompile Include="core\inflate.cpp" />
     <ClCompile Include="core\json.cpp" />
     <ClCompile Include="core\launcher.cpp" />
@@ -125,6 +126,7 @@
     <ClInclude Include="custom\custom.hpp" />
     <ClInclude Include="main.hpp" />
     <ClInclude Include="version.hpp" />
+    <ClInclude Include="core\fflags.hpp" />
     <ClInclude Include="core\json.hpp" />
     <ClInclude Include="core\inflate.hpp" />
     <ClInclude Include="core\launcher.hpp" />

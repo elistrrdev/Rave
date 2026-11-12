@@ -13,6 +13,12 @@ auto SetStyle() noexcept -> void {
     style.WindowPadding = { 0.f, 0.f };
 	style.WindowShadowSize = 0.f;
     style.Colors[ImGuiCol_ChildBg] = colors::Transparent;
+    style.Colors[ImGuiCol_ModalWindowDimBg] = RGBA(0, 0, 0, 140);
+    style.Colors[ImGuiCol_PopupBg] = RGBA(16, 18, 18, 250);
+    style.Colors[ImGuiCol_Border] = RGBA(106, 221, 187, 40);
+    style.Colors[ImGuiCol_TextSelectedBg] = RGBA(106, 221, 187, 90);
+    style.PopupRounding = 10.f;
+    style.PopupBorderSize = 1.f;
 }
 
 auto SmoothResize(RECT winRect) noexcept -> void {
@@ -82,27 +88,7 @@ static auto getMaxSize(std::vector<std::string> arr, std::vector<ImFont*> fonts)
     return size;
 }
 
-auto misc::separator() noexcept -> void
-{
-    ImGuiWindow* window = GetCurrentWindow();
-    _V2 pos = window->DC.CursorPos;
-    _V2 size = { window->Size.x - GetCursorPosX() * 2, 1 };
-
-    ItemSize(size, 0);
-    ItemAdd({ pos, pos + size }, 0);
-
-    window->DrawList->AddLine(pos, pos + size, _CO(colors::Main));
-}
-
-std::map<rowStatus, _V4> rowColors =
-{
-    { rowStatus::good, colors::Green },
-    { rowStatus::bad, colors::Red },
-    { rowStatus::accent, colors::Main },
-    { rowStatus::info, colors::Lwhite }
-};
-
-auto misc::row(const std::string& label, const std::string& value, rowStatus status) noexcept -> void
+auto misc::row(const std::string& label, const std::string& value) noexcept -> void
 {
     ImGuiWindow* window = GetCurrentWindow();
 
@@ -116,8 +102,8 @@ auto misc::row(const std::string& label, const std::string& value, rowStatus sta
     ItemSize(size, 0);
     ItemAdd({ pos, pos + size }, 0);
 
-    _V4 valueColor = getColor(rowColors, status);
-    _V4 labelColor = status == rowStatus::info ? colors::Main : valueColor;
+    _V4 valueColor = colors::Lwhite;
+    _V4 labelColor = colors::Main;
 
     window->DrawList->AddText(
         pos,
@@ -168,14 +154,6 @@ auto misc::announcement(const std::string& title, const std::string& description
         width
     );
     PopFont();
-}
-
-auto misc::centeredText(const std::string& text, float y, const _V4& col) noexcept -> void
-{
-    ImGuiWindow* window = GetCurrentWindow();
-    _V2 size = _C(text.c_str());
-    SetCursorPos({ (window->Size.x - size.x) / 2, y });
-    draw::text(text, {}, col);
 }
 
 auto misc::child(const std::string& ID, _V2 size) noexcept -> void

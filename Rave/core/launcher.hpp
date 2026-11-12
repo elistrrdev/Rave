@@ -4,23 +4,20 @@
 
 namespace launcher
 {
-    enum class Task { Idle, Checking, Installing, Launching, Closing };
+    enum class Task { Idle, Checking, Installing, Launching };
     enum class LogLevel { Success, Error, Warn, Info };
 
     struct Snapshot
     {
-        std::string installed;
         std::string latest;
         bool latestKnown = false;
-        bool running = false;
     };
 
     using Logger = std::function<void(const std::string&, LogLevel)>;
 
     void setLogger(Logger logger);
     void startMonitor();
-    void launch(bool reinstall);
-    void closeRoblox();
+    void launch();
 
     Task task();
     float progress();

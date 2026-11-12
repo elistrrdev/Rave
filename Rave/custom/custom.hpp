@@ -16,14 +16,6 @@ RAVE enum __DrawFlags : DrawFlags {
     RoundBotRight= 1 << 6
 };
 
-enum class rowStatus
-{
-    good,
-    bad,
-    accent,
-    info
-};
-
 enum class logType
 {
     success,
@@ -37,12 +29,10 @@ namespace misc
     RAVE auto begin(const std::string& name) noexcept -> void;
     RAVE auto set_blur(HWND hwnd) noexcept -> void;
     auto renderMulticolorText(std::vector<std::string> texts, std::vector<ImFont*> fonts, std::vector<_V4> colors) noexcept -> void;
-    auto centeredText(const std::string& text, float y, const _V4& col) noexcept -> void;
     auto child(const std::string& ID, _V2 size) noexcept -> void;
     auto child2(const std::string& ID, _V2 size) noexcept -> void;
     auto announcement(const std::string& title, const std::string& description) noexcept -> void;
-    auto row(const std::string& label, const std::string& value, rowStatus status) noexcept -> void;
-    auto separator() noexcept -> void;
+    auto row(const std::string& label, const std::string& value) noexcept -> void;
 }
 
 namespace draw

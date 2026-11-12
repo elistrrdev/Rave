@@ -1,7 +1,7 @@
 #include "launcher.hpp"
+#include "fflags.hpp"
 #include "report.hpp"
 #include "roblox.hpp"
-#include "system.hpp"
 #include <windows.h>
 #include <objbase.h>
 #include <atomic>
@@ -30,28 +30,22 @@ namespace
             log("Bug report saved to %TEMP%\\rave-temp", launcher::LogLevel::Info);
     }
 
+    void storeLatest(const std::string& guid)
+    {
+        std::lock_guard<std::mutex> guard(stateLock);
+        state.latest = guid;
+        state.latestKnown = true;
+    }
+
     void refreshLatest()
     {
         roblox::Latest latest;
         std::string error;
         if (roblox::fetchLatest(latest, error))
-        {
-            std::lock_guard<std::mutex> guard(stateLock);
-            state.latest = latest.guid;
-            state.latestKnown = true;
-        }
+            storeLatest(latest.guid);
     }
 
-    void refreshLocal()
-    {
-        std::string installed = roblox::installedGuid();
-        bool running = roblox::isRunning();
-        std::lock_guard<std::mutex> guard(stateLock);
-        state.installed = installed;
-        state.running = running;
-    }
-
-    void runLaunch(bool reinstall)
+    void runLaunch()
     {
         CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
@@ -68,38 +62,22 @@ namespace
             CoUninitialize();
             return;
         }
-        {
-            std::lock_guard<std::mutex> guard(stateLock);
-            state.latest = latest.guid;
-            state.latestKnown = true;
-        }
+        storeLatest(latest.guid);
 
         std::string installed = roblox::installedGuid();
-        bool needsInstall = reinstall || installed != latest.guid;
-
-        if (needsInstall && installed == latest.guid && roblox::isRunning())
-        {
-            log("Close Roblox before reinstalling it", launcher::LogLevel::Warn);
-            currentTask = launcher::Task::Idle;
-            CoUninitialize();
-            return;
-        }
-
-        if (needsInstall)
+        if (installed != latest.guid)
         {
             currentTask = launcher::Task::Installing;
             log(installed.empty() ? "Installing Roblox " + latest.version : "Updating Roblox to " + latest.version, launcher::LogLevel::Warn);
             if (!roblox::install(latest.guid, [](float f) { currentProgress = f; return true; }, error))
             {
                 failWithReport("Roblox install failed", error);
-                refreshLocal();
                 currentTask = launcher::Task::Idle;
                 CoUninitialize();
                 return;
             }
             roblox::removeOldVersions(latest.guid);
             log("Roblox " + latest.version + " installed", launcher::LogLevel::Success);
-            refreshLocal();
         }
         else
         {
@@ -107,6 +85,9 @@ namespace
         }
 
         currentTask = launcher::Task::Launching;
+        if (!fflags::apply(roblox::versionDir(latest.guid)))
+            log("Could not apply the FFlags", launcher::LogLevel::Warn);
+
         log("Launching Roblox", launcher::LogLevel::Info);
         if (!roblox::launch(latest.guid, error))
         {
@@ -124,31 +105,9 @@ namespace
                 Sleep(150);
         }
         log(started ? "Roblox is running" : "Roblox was started, waiting for it to open", started ? launcher::LogLevel::Success : launcher::LogLevel::Warn);
-        refreshLocal();
 
         currentTask = launcher::Task::Idle;
         CoUninitialize();
-    }
-
-    void runClose()
-    {
-        currentTask = launcher::Task::Closing;
-        int closed = roblox::close();
-        if (closed > 0)
-            log("Roblox was closed", launcher::LogLevel::Success);
-        else
-            log("Roblox is not running", launcher::LogLevel::Info);
-        refreshLocal();
-        currentTask = launcher::Task::Idle;
-    }
-
-    bool begin()
-    {
-        launcher::Task expected = launcher::Task::Idle;
-        if (currentTask.compare_exchange_strong(expected, launcher::Task::Checking))
-            return true;
-        log("Rave is busy, please wait", launcher::LogLevel::Info);
-        return false;
     }
 }
 
@@ -160,32 +119,23 @@ void launcher::setLogger(Logger l)
 void launcher::startMonitor()
 {
     std::thread([] {
-        refreshLocal();
-        refreshLatest();
-        DWORD lastLatest = GetTickCount();
         for (;;)
         {
-            Sleep(2000);
-            refreshLocal();
-            if (GetTickCount() - lastLatest > 10 * 60 * 1000)
-            {
-                refreshLatest();
-                lastLatest = GetTickCount();
-            }
+            refreshLatest();
+            Sleep(10 * 60 * 1000);
         }
     }).detach();
 }
 
-void launcher::launch(bool reinstall)
+void launcher::launch()
 {
-    if (begin())
-        std::thread(runLaunch, reinstall).detach();
-}
-
-void launcher::closeRoblox()
-{
-    if (begin())
-        std::thread(runClose).detach();
+    Task expected = Task::Idle;
+    if (!currentTask.compare_exchange_strong(expected, Task::Checking))
+    {
+        log("Rave is busy, please wait", LogLevel::Info);
+        return;
+    }
+    std::thread(runLaunch).detach();
 }
 
 launcher::Task launcher::task()

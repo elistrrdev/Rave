@@ -191,24 +191,6 @@ std::vector<DWORD> sys::findProcesses(const std::wstring& exeName)
     return result;
 }
 
-int sys::killProcesses(const std::wstring& exeName)
-{
-    int killed = 0;
-    for (DWORD pid : findProcesses(exeName))
-    {
-        HANDLE h = OpenProcess(PROCESS_TERMINATE | SYNCHRONIZE, FALSE, pid);
-        if (!h)
-            continue;
-        if (TerminateProcess(h, 0))
-        {
-            WaitForSingleObject(h, 5000);
-            ++killed;
-        }
-        CloseHandle(h);
-    }
-    return killed;
-}
-
 void sys::openFolder(const std::wstring& path)
 {
     ShellExecuteW(nullptr, L"open", path.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
