@@ -2,9 +2,9 @@
 #define RAVE_VERSION_HPP
 
 #define RAVE_VERSION_MAJOR 0
-#define RAVE_VERSION_MINOR 2
-#define RAVE_VERSION_STR "0.2"
-#define RAVE_VERSION_WSTR L"0.2"
+#define RAVE_VERSION_MINOR 3
+#define RAVE_VERSION_STR "0.3"
+#define RAVE_VERSION_WSTR L"0.3"
 
 #define RAVE_NAME "Rave"
 #define RAVE_WNAME L"Rave"

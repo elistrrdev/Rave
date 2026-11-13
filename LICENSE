@@ -108,7 +108,7 @@ Where a law that cannot be excluded allows you to do any of the above (for examp
 
 8.1 Rave does not have its own user accounts, never asks for your Roblox password, does not show advertising and does not contain tracking or telemetry. Rave does not send any personal data to the Developer. The Roblox accounts that you add to Rave (Section 7.6) are only sent to Roblox Corporation.
 
-8.2 Rave connects to the internet only for its own functions. In version 0.2 these are: a connection check with Microsoft (www.msftconnecttest.com), the Roblox version service and the Roblox download servers (clientsettingscdn.roblox.com and setup.rbxcdn.com), and, for the account manager, the Roblox login and account services (apis.roblox.com, auth.roblox.com, users.roblox.com) and the Roblox avatar pictures (thumbnails.roblox.com and *.rbxcdn.com). Like any internet connection, these services can see your IP address and that a request was made. Their own privacy rules apply.
+8.2 Rave connects to the internet only for its own functions. In version 0.3 these are: a connection check with Microsoft (www.msftconnecttest.com), the Roblox version service and the Roblox download servers (clientsettingscdn.roblox.com and setup.rbxcdn.com), and, for the account manager, the Roblox login and account services (apis.roblox.com, auth.roblox.com, users.roblox.com) and the Roblox avatar pictures (thumbnails.roblox.com and *.rbxcdn.com). Like any internet connection, these services can see your IP address and that a request was made. Their own privacy rules apply.
 
 8.3 Rave stores its files only on your computer, mainly in the folder %LOCALAPPDATA%\Rave. These are the Roblox client versions that Rave downloaded, your FFlags (fflags.json), your Rave settings (settings.json) and, if you added Roblox accounts, accounts.dat. accounts.dat contains the account id, name, display name and login cookie of every added account and the selected account. It is encrypted with Windows (DPAPI) so that only your Windows user account on this computer can read it. Rave does not write log files.
 
@@ -134,7 +134,7 @@ Where a law that cannot be excluded allows you to do any of the above (for examp
 
 10. EARLY VERSIONS
 
-10.1 Rave version 0.2, and every version marked as preview, beta, early access or similar, is an early version. It can contain errors, can be incomplete, can change a lot and can be stopped at any time.
+10.1 Rave version 0.3, and every version marked as preview, beta, early access or similar, is an early version. It can contain errors, can be incomplete, can change a lot and can be stopped at any time.
 
 10.2 Early versions are provided only for trying them out and giving feedback. You must not share them, publish them, or show them to others as a finished or official release, unless the Developer allows it in writing.
 
