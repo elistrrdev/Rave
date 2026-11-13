@@ -2,7 +2,7 @@ RAVE END USER LICENSE AGREEMENT AND TERMS OF USE
 
 Copyright (c) 2026 elistrrdev. All rights reserved.
 
-Last updated: November 12, 2026
+Last updated: November 13, 2026
 
 PLEASE READ THIS AGREEMENT CAREFULLY BEFORE INSTALLING OR USING RAVE. BY CLICKING "I ACCEPT", BY INSTALLING, COPYING, STARTING OR OTHERWISE USING RAVE, YOU AGREE TO BE BOUND BY THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT INSTALL OR USE RAVE, CANCEL THE SETUP AND DELETE ALL COPIES OF RAVE IN YOUR POSSESSION.
 
@@ -37,18 +37,20 @@ PLEASE READ THIS AGREEMENT CAREFULLY BEFORE INSTALLING OR USING RAVE. BY CLICKIN
 
 3.2 The name "Rave", the Rave logos and the Rave icons are identifiers of the Developer. Nothing in this Agreement gives you any right to use them, except to refer to Rave in an honest and accurate way.
 
-3.3 The source code of Rave is confidential and is a trade secret of the Developer. Rave is not open source software. No source code is licensed to you under this Agreement.
+3.3 The Developer publishes the source code of Rave on GitHub (https://github.com/elistrrdev/Rave) so that anyone can see how Rave works. Rave is not open source software. Being able to read the source code does not give you any license to it, and no source code is licensed to you under this Agreement. You may read the source code, but you must not copy, build, compile, modify, publish, distribute or otherwise use it or any part of it, except for the rights that the GitHub Terms of Service give to GitHub users for public repositories (viewing and forking the repository on GitHub), and only as far as those terms require.
 
 3.4 All rights that are not expressly granted to you in this Agreement are reserved by the Developer.
 
 
 4. LICENSE GRANT
 
-4.1 Subject to your continuous compliance with this Agreement, the Developer grants you a personal, limited, non-exclusive, non-transferable, non-sublicensable and revocable license to install and use one copy of Rave in object code form on each computer that you own or lawfully control, only for your own private and non-commercial use, and only in the form in which it was provided by the Developer through an official Rave distribution channel.
+4.1 Subject to your continuous compliance with this Agreement, the Developer grants you a personal, limited, non-exclusive, non-transferable, non-sublicensable and revocable license to install and use one copy of Rave in object code form on each computer that you own or lawfully control, only for your own private and non-commercial use, and only in the form in which it was provided by the Developer through an official Rave distribution channel. The official distribution channel is currently the releases page of https://github.com/elistrrdev/Rave.
 
 4.2 You may make one backup copy of the Rave Setup program for your own use, provided that the backup keeps all copyright notices and this Agreement.
 
-4.3 If you received a preview, a beta or any other unreleased version of Rave, you may only use it for trying it out and giving feedback to the Developer, and only as long as the Developer allows it.
+4.3 A build of Rave that was made from the published source code by anyone other than the Developer is not an official Rave build and is not licensed to you under this Agreement.
+
+4.4 If you received a preview, a beta or any other unreleased version of Rave, you may only use it for trying it out and giving feedback to the Developer, and only as long as the Developer allows it.
 
 
 5. RESTRICTIONS
@@ -57,7 +59,7 @@ Except as expressly allowed by this Agreement or by mandatory law that cannot be
 
 5.1 copy, reproduce, publish, upload, share, mirror, sell, resell, rent, lease, lend, sublicense, distribute or otherwise make Rave or any part of it available to any other person, including through websites, file hosting services, torrents, chat services, game communities or app stores;
 
-5.2 reverse engineer, decompile, disassemble, decrypt, unpack, debug, trace, analyze or otherwise try to find out the source code, structure, algorithms, internal workings, file formats or protocols of Rave;
+5.2 reverse engineer, decompile, disassemble, decrypt, unpack, debug, trace, analyze or otherwise try to find out the source code, structure, algorithms, internal workings, file formats or protocols of Rave, other than by reading the source code that the Developer publishes (Section 3.3);
 
 5.3 modify, adapt, translate, patch, crack, hook into, inject code into or create derivative works of Rave, or combine Rave with other software in a way that changes how Rave works;
 
@@ -164,7 +166,7 @@ The Developer does not have to provide support, maintenance or help of any kind.
 
 14.2 TO THE MAXIMUM EXTENT ALLOWED BY APPLICABLE LAW, THE DEVELOPER DISCLAIMS ALL WARRANTIES AND CONDITIONS, INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY, SATISFACTORY QUALITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, ACCURACY, QUIET ENJOYMENT, AND ANY WARRANTY THAT MAY ARISE FROM A COURSE OF DEALING OR USAGE OF TRADE.
 
-14.3 WITHOUT LIMITING THE ABOVE, THE DEVELOPER DOES NOT PROMISE THAT RAVE WILL MEET YOUR NEEDS, WORK WITHOUT INTERRUPTION OR ERRORS, BE SECURE, BE FREE OF HARMFUL CODE, WORK WITH YOUR COMPUTER OR WITH ANY VERSION OF ROBLOX OR WINDOWS, KEEP YOUR ROBLOX ACCOUNT SAFE, DETECT ANY CHEAT, OR THAT ANY ERROR WILL BE FIXED.
+14.3 WITHOUT LIMITING THE ABOVE, THE DEVELOPER DOES NOT PROMISE THAT RAVE WILL MEET YOUR NEEDS, WORK WITHOUT INTERRUPTION OR ERRORS, BE SECURE, BE FREE OF HARMFUL CODE, WORK WITH YOUR COMPUTER OR WITH ANY VERSION OF ROBLOX OR WINDOWS, KEEP YOUR ROBLOX ACCOUNT SAFE, OR THAT ANY ERROR WILL BE FIXED.
 
 14.4 YOU USE RAVE AT YOUR OWN RISK. YOU ARE RESPONSIBLE FOR BACKING UP YOUR DATA AND FOR ANY DAMAGE TO YOUR COMPUTER, LOSS OF DATA, OR CONSEQUENCES FOR YOUR ROBLOX ACCOUNT THAT RESULT FROM USING RAVE.
 
@@ -232,7 +234,7 @@ If you are a consumer, you may have rights under the mandatory law of the countr
 
 22. CONTACT
 
-Questions about this Agreement or about Rave can be sent to the Developer through the official Rave channels, currently the GitHub profile https://github.com/elistrrdev.
+Questions about this Agreement or about Rave can be sent to the Developer through the official Rave channels, currently the GitHub repository https://github.com/elistrrdev/Rave and the GitHub profile https://github.com/elistrrdev.
 
 
 BY CLICKING "I ACCEPT", OR BY INSTALLING OR USING RAVE, YOU CONFIRM THAT YOU HAVE READ THIS AGREEMENT, THAT YOU UNDERSTAND IT, AND THAT YOU AGREE TO BE BOUND BY IT.
