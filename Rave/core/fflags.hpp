@@ -19,8 +19,7 @@ namespace fflags
     };
 
     const std::vector<Preset>& presets();
-    bool presetActive(const std::string& text, const Preset& preset);
-    bool setPreset(std::string& text, const Preset& preset, bool on, std::string& error);
+    bool applyPreset(std::string& text, const Preset& preset, std::string& error);
 
     std::string load();
     bool validate(const std::string& text, std::string& error);

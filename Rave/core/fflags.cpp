@@ -91,24 +91,6 @@ namespace
         }
     }
 
-    std::string asText(const json::Value& v)
-    {
-        switch (v.type)
-        {
-        case json::Value::Type::String: return v.string;
-        case json::Value::Type::Bool: return v.boolean ? "true" : "false";
-        case json::Value::Type::Number: return number(v.number);
-        default: return {};
-        }
-    }
-
-    bool sameValue(const json::Value& v, const char* expected)
-    {
-        if (v.type == json::Value::Type::Null || v.type == json::Value::Type::Array || v.type == json::Value::Type::Object)
-            return false;
-        return _stricmp(asText(v).c_str(), expected) == 0;
-    }
-
     int find(const json::Value& obj, const char* key)
     {
         for (size_t i = 0; i < obj.keys.size(); ++i)
@@ -187,21 +169,7 @@ const std::vector<fflags::Preset>& fflags::presets()
     return list;
 }
 
-bool fflags::presetActive(const std::string& text, const Preset& preset)
-{
-    json::Value obj;
-    if (!readObject(text, obj))
-        return false;
-    for (const PresetFlag& flag : preset.flags)
-    {
-        int i = find(obj, flag.name);
-        if (i < 0 || !sameValue(obj.items[i], flag.value))
-            return false;
-    }
-    return true;
-}
-
-bool fflags::setPreset(std::string& text, const Preset& preset, bool on, std::string& error)
+bool fflags::applyPreset(std::string& text, const Preset& preset, std::string& error)
 {
     json::Value obj;
     if (!readObject(text, obj))
@@ -209,33 +177,24 @@ bool fflags::setPreset(std::string& text, const Preset& preset, bool on, std::st
         error = "Fix the JSON in the editor first";
         return false;
     }
-    if (on)
+    for (const char* key : preset.replaces)
+        erase(obj, key);
+    for (const PresetFlag& flag : preset.flags)
     {
-        for (const char* key : preset.replaces)
-            erase(obj, key);
-        for (const PresetFlag& flag : preset.flags)
+        json::Value value;
+        value.type = json::Value::Type::String;
+        value.string = flag.value;
+        int i = find(obj, flag.name);
+        if (i >= 0)
+            obj.items[i] = value;
+        else
         {
-            json::Value value;
-            value.type = json::Value::Type::String;
-            value.string = flag.value;
-            int i = find(obj, flag.name);
-            if (i >= 0)
-                obj.items[i] = value;
-            else
-            {
-                obj.keys.push_back(flag.name);
-                obj.items.push_back(value);
-            }
+            obj.keys.push_back(flag.name);
+            obj.items.push_back(value);
         }
     }
-    else
-    {
-        for (const PresetFlag& flag : preset.flags)
-            erase(obj, flag.name);
-    }
     text.clear();
-    if (!obj.items.empty())
-        dump(obj, 0, text);
+    dump(obj, 0, text);
     return true;
 }
 

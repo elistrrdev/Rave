@@ -726,25 +726,21 @@ static void presetRow(const fflags::Preset& preset, size_t index, float width)
 	ImDrawList* dl = w->DrawList;
 	const _V2 pos = w->DC.CursorPos;
 	const float height = 48;
-	const bool active = fflags::presetActive(editor::text, preset);
 
-	_V4 bg = active ? colors::withAlpha(colors::Main, 0.10f) : _V4(RGBA(255, 255, 255, 8));
-	dl->AddRectFilled(pos, pos + _V2(width, height), _CO(bg), 8.f);
-	if (active)
-		dl->AddRect(pos, pos + _V2(width, height), _CO(colors::withAlpha(colors::Main, 0.55f)), 8.f, 0, 1.f);
+	dl->AddRectFilled(pos, pos + _V2(width, height), _CO(_V4(RGBA(255, 255, 255, 8))), 8.f);
 
 	dl->AddText(pos + _V2(12, 6), _CO(colors::Lwhite), preset.name);
 	dl->AddText(pos + _V2(12, 26), _CO(colors::Gray), preset.info);
 
-	const _V2 btn = { 64, 28 };
+	const _V2 btn = { 76, 28 };
 	SetCursorScreenPos({ pos.x + width - 10 - btn.x, pos.y + (height - btn.y) / 2 });
-	if (items::choice((active ? "ON##preset" : "OFF##preset") + std::to_string(index), active, btn))
+	if (items::choice("APPLY##preset" + std::to_string(index), false, btn))
 	{
 		std::string error;
-		if (fflags::setPreset(editor::text, preset, !active, error))
+		if (fflags::applyPreset(editor::text, preset, error))
 		{
-			editor::status = std::string(preset.name) + (active ? " removed" : " added");
-			editor::statusColor = active ? colors::Gray : colors::Green;
+			editor::status = std::string(preset.name) + " pasted into the editor";
+			editor::statusColor = colors::Green;
 		}
 		else
 		{
