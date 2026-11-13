@@ -351,11 +351,20 @@ static void homePage(ImGuiWindow* window)
 	EndChild();
 }
 
+namespace removal
+{
+	uint64_t id = 0;
+	double until = 0;
+
+	void reset()
+	{
+		id = 0;
+		until = 0;
+	}
+}
+
 static void accountRow(const accounts::Account& account, bool selected, float width)
 {
-	static uint64_t confirmId = 0;
-	static double confirmUntil = 0;
-
 	ImGuiWindow* w = GetCurrentWindow();
 	ImDrawList* dl = w->DrawList;
 	const _V2 pos = w->DC.CursorPos;
@@ -401,19 +410,19 @@ static void accountRow(const accounts::Account& account, bool selected, float wi
 	const std::string id = std::to_string(account.id);
 
 	SetCursorScreenPos({ pos.x + width - 10 - btn.x, btnY });
-	bool confirming = confirmId == account.id && GetTime() < confirmUntil;
-	if (items::choice((confirming ? "SURE?##rm" : "REMOVE##rm") + id, false, btn))
+	bool confirming = removal::id == account.id && GetTime() < removal::until;
+	if (confirming ? items::danger("SURE?##rm" + id, btn) : items::choice("REMOVE##rm" + id, false, btn))
 	{
 		if (confirming)
 		{
-			confirmId = 0;
+			removal::reset();
 			avatars::forget(account.id);
 			accounts::remove(account.id);
 		}
 		else
 		{
-			confirmId = account.id;
-			confirmUntil = GetTime() + 3.0;
+			removal::id = account.id;
+			removal::until = GetTime() + 3.0;
 		}
 	}
 
@@ -777,7 +786,8 @@ static void fflagsEditor(ImGuiWindow* window)
 	}
 
 	const _V2 boxPos = { 20, 64 };
-	const _V2 boxSize = { popup->Size.x - 40, 212 };
+	const _V2 boxSize = { popup->Size.x - 40, 200 };
+	const float saveY = popup->Size.y - 20 - 40;
 
 	PushStyleVar(ImGuiStyleVar_FramePadding, { 12, 10 });
 	PushStyleVar(ImGuiStyleVar_FrameRounding, 6.f);
@@ -797,9 +807,12 @@ static void fflagsEditor(ImGuiWindow* window)
 	PopStyleVar(2);
 
 	if (!editor::status.empty())
-		draw::text(editor::status, { 20, 284 }, editor::statusColor);
+	{
+		const float boxEnd = boxPos.y + boxSize.y;
+		draw::text(editor::status, { 20, std::floor(boxEnd + (saveY - boxEnd - GetFontSize()) / 2) }, editor::statusColor);
+	}
 
-	SetCursorPos({ 20, popup->Size.y - 20 - 40 });
+	SetCursorPos({ 20, saveY });
 	if (items::button("SAVE", { popup->Size.x - 40, 40 }))
 		editor::saveAndClose();
 
@@ -891,6 +904,7 @@ static void settingsWindow(ImGuiWindow* window)
 
 void ui::Render() {
 	static Tab tab = Tab::Home;
+	const Tab shownTab = tab;
 
 	logo::refresh(accentNow);
 
@@ -924,6 +938,9 @@ void ui::Render() {
 			SameLine();
 			if (items::tab("Info", tab == Tab::Info))
 				tab = Tab::Info;
+
+			if (tab != shownTab)
+				removal::reset();
 
 			if (images::logo)
 				draw::image(images::logo, { (window->Size.x - images::logoSize.x) / 2, 48 - images::logoSize.y / 2 }, images::logoSize, colors::White, 0);

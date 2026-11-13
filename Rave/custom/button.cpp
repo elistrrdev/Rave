@@ -59,6 +59,27 @@ auto items::choice(const std::string& label, bool selected, const _V2& size, flo
 	return r;
 }
 
+auto items::danger(const std::string& label, const _V2& size, float rounding) noexcept -> bool
+{
+	ImGuiWindow* window = GetCurrentWindow();
+
+	std::string shown = label.substr(0, label.find("##"));
+	_V2 lSize(_C(shown.c_str()));
+	_V2 pos = window->DC.CursorPos;
+
+	bool r = InvisibleButton(label.c_str(), size);
+	bool act = IsItemActive();
+	bool hov = IsItemHovered();
+
+	_V4 bgcol = act ? colors::Red : hov ? colors::hoverOf(colors::Red) : colors::Red;
+	_V4 textcol = act ? buttoncol::textAct : buttoncol::textC;
+
+	window->DrawList->AddRectFilled(pos, pos + size, _CO(bgcol), rounding);
+	window->DrawList->AddText(pos + (size - lSize) / 2, _CO(textcol), shown.c_str());
+
+	return r;
+}
+
 auto items::swatch(const std::string& id, uint32_t rgb, bool selected, const _V2& size) noexcept -> bool
 {
 	ImGuiWindow* window = GetCurrentWindow();
