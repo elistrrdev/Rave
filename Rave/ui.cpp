@@ -5,6 +5,7 @@
 #include "core/settings.hpp"
 #include "core/sysinfo.hpp"
 #include "core/system.hpp"
+#include "core/updater.hpp"
 #include <thread>
 
 static std::string windowsName;
@@ -190,6 +191,7 @@ void ui::BeforeLoop(ID3D11Device* dvc) {
 	accounts::setLogger(logger);
 	accounts::load();
 	launcher::startMonitor();
+	updater::start(window::dx::hwnd);
 }
 
 static std::string launchLabel()

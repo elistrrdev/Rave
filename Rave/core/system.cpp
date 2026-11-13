@@ -203,17 +203,30 @@ std::wstring sys::widen(const std::string& s)
     return out;
 }
 
+namespace
+{
+    std::string hashHex(BCRYPT_ALG_HANDLE alg, const void* data, size_t len, size_t digestSize)
+    {
+        unsigned char digest[32]{};
+        if (BCryptHash(alg, nullptr, 0, (PUCHAR)data, (ULONG)len, digest, (ULONG)digestSize) != 0)
+            return {};
+        static const char* hex = "0123456789abcdef";
+        std::string out;
+        for (size_t i = 0; i < digestSize; ++i)
+        {
+            out += hex[digest[i] >> 4];
+            out += hex[digest[i] & 15];
+        }
+        return out;
+    }
+}
+
 std::string sys::md5Hex(const void* data, size_t len)
 {
-    unsigned char digest[16]{};
-    if (BCryptHash(BCRYPT_MD5_ALG_HANDLE, nullptr, 0, (PUCHAR)data, (ULONG)len, digest, sizeof(digest)) != 0)
-        return {};
-    static const char* hex = "0123456789abcdef";
-    std::string out;
-    for (unsigned char b : digest)
-    {
-        out += hex[b >> 4];
-        out += hex[b & 15];
-    }
-    return out;
+    return hashHex(BCRYPT_MD5_ALG_HANDLE, data, len, 16);
+}
+
+std::string sys::sha256Hex(const void* data, size_t len)
+{
+    return hashHex(BCRYPT_SHA256_ALG_HANDLE, data, len, 32);
 }

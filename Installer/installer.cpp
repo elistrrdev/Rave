@@ -44,6 +44,7 @@ namespace
         ID_DESKTOP = 115,
         ID_DETAILS = 116,
         ID_LAUNCH = 117,
+        ID_UPDATE_TIMER = 118,
     };
 
     const int kWidth = 500;
@@ -77,6 +78,8 @@ namespace
     int progress = 0;
     bool startMenu = true;
     bool desktop = true;
+    bool updateMode = false;
+    DWORD updatePid = 0;
     bool installing = false;
     bool installed = false;
     bool failed = false;
@@ -235,10 +238,23 @@ namespace
 
     bool closeRave(HWND owner)
     {
-        while (!raveProcesses().empty())
+        if (updateMode && updatePid)
         {
-            int answer = message(owner, L"Rave is currently running.\n\nClick OK to close Rave and continue, or Cancel to stop.", kTitle, MB_OKCANCEL | MB_ICONWARNING);
-            if (answer != IDOK)
+            HANDLE waiting = OpenProcess(SYNCHRONIZE, FALSE, updatePid);
+            if (waiting)
+            {
+                WaitForSingleObject(waiting, 15000);
+                CloseHandle(waiting);
+            }
+        }
+        for (int attempt = 0; !raveProcesses().empty(); ++attempt)
+        {
+            if (updateMode)
+            {
+                if (attempt >= 3)
+                    return false;
+            }
+            else if (message(owner, L"Rave is currently running.\n\nClick OK to close Rave and continue, or Cancel to stop.", kTitle, MB_OKCANCEL | MB_ICONWARNING) != IDOK)
                 return false;
             for (DWORD pid : raveProcesses())
             {
@@ -843,7 +859,18 @@ namespace
             case PageLicense: title = L"License Agreement"; subtitle = L"Please review the license terms before installing Rave V" RAVE_VERSION_WSTR L"."; break;
             case PageLocation: title = L"Choose Install Location"; subtitle = L"Choose the folder in which to install Rave V" RAVE_VERSION_WSTR L"."; break;
             case PageOptions: title = L"Choose Additional Tasks"; subtitle = L"Which additional tasks should be performed?"; break;
-            case PageInstall: title = L"Installing"; subtitle = L"Please wait while Rave V" RAVE_VERSION_WSTR L" is being installed."; break;
+            case PageInstall:
+                if (updateMode)
+                {
+                    title = L"Updating";
+                    subtitle = L"Please wait while Rave is updated to V" RAVE_VERSION_WSTR L".";
+                }
+                else
+                {
+                    title = L"Installing";
+                    subtitle = L"Please wait while Rave V" RAVE_VERSION_WSTR L" is being installed.";
+                }
+                break;
             }
             text(dc, boldFont, theme.text, R(20, 11, 400, 18), title, DT_SINGLELINE);
             text(dc, bodyFont, theme.subtext, R(34, 30, 390, 18), subtitle, DT_SINGLELINE | DT_END_ELLIPSIS);
@@ -1183,7 +1210,7 @@ namespace
             CoUninitialize();
         };
 
-        step(L"Checking for a running Rave...", 5);
+        step(updateMode ? L"Waiting for Rave to close..." : L"Checking for a running Rave...", 5);
         if (!closeRave(mainWindow))
         {
             fail(L"Setup was cancelled because Rave is still running.");
@@ -1301,7 +1328,23 @@ namespace
             return;
         }
         if (failed || message(mainWindow, L"Are you sure you want to quit Rave Setup?", kTitle, MB_YESNO | MB_ICONQUESTION) == IDYES)
+        {
             DestroyWindow(mainWindow);
+            if (updateMode && PathFileExistsW((installDir + L"\\Rave.exe").c_str()))
+                launchRave();
+        }
+    }
+
+    void startUpdate()
+    {
+        installDir = defaultDir();
+        startMenu = PathFileExistsW(startMenuShortcut().c_str()) != FALSE;
+        desktop = PathFileExistsW(desktopShortcut().c_str()) != FALSE;
+        installing = true;
+        progress = 0;
+        status = L"Preparing...";
+        showPage(PageInstall);
+        std::thread(installWorker).detach();
     }
 
     void onCommand(int id, int code)
@@ -1362,7 +1405,10 @@ namespace
             mainWindow = hwnd;
             createControls();
             applyTheme();
-            showPage(PageWelcome);
+            if (updateMode)
+                startUpdate();
+            else
+                showPage(PageWelcome);
             return 0;
         case WM_GETFONT:
             return (LRESULT)bodyFont;
@@ -1423,7 +1469,10 @@ namespace
             if (wp)
             {
                 installed = true;
-                showPage(PageFinish);
+                if (updateMode)
+                    SetTimer(hwnd, ID_UPDATE_TIMER, 1000, nullptr);
+                else
+                    showPage(PageFinish);
             }
             else
             {
@@ -1438,6 +1487,15 @@ namespace
             delete str;
             return 0;
         }
+        case WM_TIMER:
+            if (wp == ID_UPDATE_TIMER)
+            {
+                KillTimer(hwnd, ID_UPDATE_TIMER);
+                DestroyWindow(hwnd);
+                launchRave();
+                return 0;
+            }
+            break;
         case WM_SETTINGCHANGE:
             if (lp && lstrcmpiW((LPCWSTR)lp, L"ImmersiveColorSet") == 0)
                 applyTheme();
@@ -1651,6 +1709,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int)
     else if ((argc >= 2 && _wcsicmp(argv[1], L"/uninstall") == 0) || _wcsicmp(name.c_str(), L"uninstall.exe") == 0)
     {
         result = startUninstall();
+    }
+    else if (argc >= 3 && _wcsicmp(argv[1], L"/update") == 0)
+    {
+        updateMode = true;
+        updatePid = wcstoul(argv[2], nullptr, 10);
+        initUi();
+        result = runInstaller();
+        deleteSelfSoon(self);
     }
     else
     {

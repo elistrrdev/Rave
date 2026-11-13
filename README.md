@@ -15,11 +15,13 @@ Rave keeps its own copy of the Roblox client in `%LOCALAPPDATA%\Rave`. Every tim
 - **Settings** - keep Rave open, minimize it or hide it while Roblox runs (it comes back when Roblox closes), and choose an accent color.
 - **Info** - Rave and Roblox versions, your specs and a HardwareID that never leaves your PC.
 
-Rave runs without admin rights, has no telemetry and writes no log files. It only talks to Microsoft for a connection check and to Roblox. The exact list is in section 8 of the [license](LICENSE).
+Rave runs without admin rights, has no telemetry and writes no log files. It only talks to Microsoft for a connection check, to Roblox, and to GitHub to look for Rave updates. The exact list is in section 8 of the [license](LICENSE).
 
 ## Install
 
 Download `Rave-Installer.exe` from the [releases](https://github.com/elistrrdev/Rave/releases) and run it. Setup puts Rave in `C:\Program Files\Rave`, adds the shortcuts you choose and registers an uninstaller in Apps and Features.
+
+After that Rave keeps itself up to date. When a new version is out, Rave installs it on its own the next time it starts. Windows asks for admin rights for the update, the same as for the first install.
 
 Requires Windows 10 or 11 (64-bit).
 

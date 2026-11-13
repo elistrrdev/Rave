@@ -19,4 +19,5 @@ namespace sys
     std::string narrow(const std::wstring& s);
     std::wstring widen(const std::string& s);
     std::string md5Hex(const void* data, size_t len);
+    std::string sha256Hex(const void* data, size_t len);
 }
