@@ -11,7 +11,7 @@
 Rave keeps its own copy of the Roblox client in `%LOCALAPPDATA%\Rave`. Every time you hit **Launch Roblox** it checks the newest version, downloads and verifies it straight from the Roblox servers if needed, and starts it. No Roblox installer, no admin prompt.
 
 - **Accounts** - add your Roblox accounts with Quick Log In (code or QR) or a `.ROBLOSECURITY` cookie, pick one and Roblox opens already signed in. Accounts are stored encrypted with Windows DPAPI, so only your Windows user can read them. Your password is never asked for.
-- **FFlags editor** - write, import and export FFlags as JSON. They are applied every time Roblox starts, even after an update.
+- **FFlags editor** - write, import and export FFlags as JSON, or switch on presets like Potato mode, no grass or Vulkan with one click. Presets only use flags Roblox still accepts. Your flags are applied every time Roblox starts, even after an update.
 - **Settings** - keep Rave open, minimize it or hide it while Roblox runs (it comes back when Roblox closes), and choose an accent color.
 - **Info** - Rave and Roblox versions, your specs and a HardwareID that never leaves your PC.
 

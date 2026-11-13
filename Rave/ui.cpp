@@ -111,15 +111,17 @@ namespace editor
 	static std::string original;
 	static std::string status;
 	static _V4 statusColor;
+	static bool presetsView = false;
 
 	static const char* kPopup = "FFLAGS EDITOR";
-	static const char* kHint = "{\n    \"DFIntTaskSchedulerTargetFps\": 9999\n}";
+	static const char* kHint = "{\n    \"FFlagDebugSkyGray\": \"True\"\n}";
 
 	static void open()
 	{
 		text = fflags::load();
 		original = text;
 		status.clear();
+		presetsView = false;
 		openRequest = true;
 	}
 
@@ -718,6 +720,43 @@ static void addAccountWindow(ImGuiWindow* window)
 	PopStyleVar();
 }
 
+static void presetRow(const fflags::Preset& preset, size_t index, float width)
+{
+	ImGuiWindow* w = GetCurrentWindow();
+	ImDrawList* dl = w->DrawList;
+	const _V2 pos = w->DC.CursorPos;
+	const float height = 48;
+	const bool active = fflags::presetActive(editor::text, preset);
+
+	_V4 bg = active ? colors::withAlpha(colors::Main, 0.10f) : _V4(RGBA(255, 255, 255, 8));
+	dl->AddRectFilled(pos, pos + _V2(width, height), _CO(bg), 8.f);
+	if (active)
+		dl->AddRect(pos, pos + _V2(width, height), _CO(colors::withAlpha(colors::Main, 0.55f)), 8.f, 0, 1.f);
+
+	dl->AddText(pos + _V2(12, 6), _CO(colors::Lwhite), preset.name);
+	dl->AddText(pos + _V2(12, 26), _CO(colors::Gray), preset.info);
+
+	const _V2 btn = { 64, 28 };
+	SetCursorScreenPos({ pos.x + width - 10 - btn.x, pos.y + (height - btn.y) / 2 });
+	if (items::choice((active ? "ON##preset" : "OFF##preset") + std::to_string(index), active, btn))
+	{
+		std::string error;
+		if (fflags::setPreset(editor::text, preset, !active, error))
+		{
+			editor::status = std::string(preset.name) + (active ? " removed" : " added");
+			editor::statusColor = active ? colors::Gray : colors::Green;
+		}
+		else
+		{
+			editor::status = error;
+			editor::statusColor = colors::Red;
+		}
+	}
+
+	SetCursorScreenPos(pos);
+	Dummy({ width, height });
+}
+
 static void fflagsEditor(ImGuiWindow* window)
 {
 	if (editor::openRequest)
@@ -789,31 +828,59 @@ static void fflagsEditor(ImGuiWindow* window)
 	const _V2 boxSize = { popup->Size.x - 40, 200 };
 	const float saveY = popup->Size.y - 20 - 40;
 
-	PushStyleVar(ImGuiStyleVar_FramePadding, { 12, 10 });
-	PushStyleVar(ImGuiStyleVar_FrameRounding, 6.f);
-	const _V4 boxColor = RGBA(255, 255, 255, 12);
-	PushStyleColor(ImGuiCol_FrameBg, boxColor);
-	PushStyleColor(ImGuiCol_FrameBgHovered, boxColor);
-	PushStyleColor(ImGuiCol_FrameBgActive, boxColor);
-	PushStyleColor(ImGuiCol_Text, colors::Lwhite);
-
-	SetCursorPos(boxPos);
-	InputTextMultiline("##fflags", editor::text.data(), editor::text.capacity() + 1, boxSize, ImGuiInputTextFlags_CallbackResize | ImGuiInputTextFlags_AllowTabInput, editor::resize, &editor::text);
-
-	if (editor::text.empty() && !IsItemActive())
-		popup->DrawList->AddText(popup->Pos + boxPos + _V2(12, 10), _CO(colors::Info), editor::kHint);
-
-	PopStyleColor(4);
-	PopStyleVar(2);
-
-	if (!editor::status.empty())
+	if (editor::presetsView)
 	{
-		const float boxEnd = boxPos.y + boxSize.y;
-		draw::text(editor::status, { 20, std::floor(boxEnd + (saveY - boxEnd - GetFontSize()) / 2) }, editor::statusColor);
+		SetCursorPos(boxPos);
+		misc::child2("FFLAG_PRESETS", boxSize);
+		{
+			PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0, 6 });
+			SetCursorPos({ 0, 0 });
+			const float rowWidth = GetContentRegionAvail().x;
+			const auto& list = fflags::presets();
+			for (size_t i = 0; i < list.size(); ++i)
+				presetRow(list[i], i, rowWidth);
+			PopStyleVar();
+		}
+		EndChild();
+	}
+	else
+	{
+		PushStyleVar(ImGuiStyleVar_FramePadding, { 12, 10 });
+		PushStyleVar(ImGuiStyleVar_FrameRounding, 6.f);
+		const _V4 boxColor = RGBA(255, 255, 255, 12);
+		PushStyleColor(ImGuiCol_FrameBg, boxColor);
+		PushStyleColor(ImGuiCol_FrameBgHovered, boxColor);
+		PushStyleColor(ImGuiCol_FrameBgActive, boxColor);
+		PushStyleColor(ImGuiCol_Text, colors::Lwhite);
+
+		SetCursorPos(boxPos);
+		InputTextMultiline("##fflags", editor::text.data(), editor::text.capacity() + 1, boxSize, ImGuiInputTextFlags_CallbackResize | ImGuiInputTextFlags_AllowTabInput, editor::resize, &editor::text);
+
+		if (editor::text.empty() && !IsItemActive())
+			popup->DrawList->AddText(popup->Pos + boxPos + _V2(12, 10), _CO(colors::Info), editor::kHint);
+
+		PopStyleColor(4);
+		PopStyleVar(2);
 	}
 
+	const float boxEnd = boxPos.y + boxSize.y;
+	const float statusY = std::floor(boxEnd + (saveY - boxEnd - GetFontSize()) / 2);
+	if (!editor::status.empty())
+		draw::text(editor::status, { 20, statusY }, editor::statusColor);
+	else if (editor::presetsView)
+		draw::text("Presets only use flags that Roblox still accepts.", { 20, statusY }, colors::Gray);
+
+	const float presetsWidth = 170;
 	SetCursorPos({ 20, saveY });
-	if (items::button("SAVE", { popup->Size.x - 40, 40 }))
+	if (items::choice(editor::presetsView ? "BACK TO EDITOR" : "PRESETS", false, { presetsWidth, 40 }, 0.f))
+	{
+		ClearActiveID();
+		editor::presetsView = !editor::presetsView;
+		editor::status.clear();
+	}
+
+	SetCursorPos({ 20 + presetsWidth + 12, saveY });
+	if (items::button("SAVE", { popup->Size.x - 40 - presetsWidth - 12, 40 }))
 		editor::saveAndClose();
 
 	PopFont();
