@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  Rave is a Roblox launcher that always downloads and starts the latest Roblox version.
+  Always the latest Roblox, one click away.
 </p>
 
 ## What it does
