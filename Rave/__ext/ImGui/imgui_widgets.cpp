@@ -4233,7 +4233,7 @@ void ImGuiInputTextState::OnCharPressed(unsigned int c)
 }
 
 // Those functions are not inlined in imgui_internal.h, allowing us to hide ImStbTexteditState from that header.
-void ImGuiInputTextState::CursorAnimReset()                 { CursorAnim = -0.30f; } // After a user-input the cursor stays on for a while without blinking
+void ImGuiInputTextState::CursorAnimReset()                 { CursorAnim = 0.0f; }
 void ImGuiInputTextState::CursorClamp()                     { Stb->cursor = ImMin(Stb->cursor, CurLenA); Stb->select_start = ImMin(Stb->select_start, CurLenA); Stb->select_end = ImMin(Stb->select_end, CurLenA); }
 bool ImGuiInputTextState::HasSelection() const              { return Stb->select_start != Stb->select_end; }
 void ImGuiInputTextState::ClearSelection()                  { Stb->select_start = Stb->select_end = Stb->cursor; }
@@ -4473,10 +4473,6 @@ void ImGui::InputTextDeactivateHook(ImGuiID id)
 //  doing UTF8 > U16 > UTF8 conversions on the go to easily interface with stb_textedit. Ideally should stay in UTF-8 all the time. See https://github.com/nothings/stb/issues/188)
 
 #include <algorithm>
-
-struct InputAnim {
-    float v, b;
-};
 
 bool ImGui::InputTextEx(const char* label, const char* hint, char* buf, int buf_size, const ImVec2& size_arg, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* callback_user_data)
 {
@@ -5333,31 +5329,16 @@ bool ImGui::InputTextEx(const char* label, const char* hint, char* buf, int buf_
             draw_window->DrawList->AddText(g.Font, g.FontSize, draw_pos - draw_scroll, col, buf_display, buf_display_end, 0.0f, is_multiline ? NULL : &clip_rect);
         }
 
-        // Draw blinking cursor
         if (render_cursor)
         {
             state->CursorAnim += io.DeltaTime;
-            bool cursor_is_visible = (!g.IO.ConfigInputTextCursorBlink) || (state->CursorAnim <= 0.0f) || ImFmod(state->CursorAnim, 1.20f) <= 0.80f;
+            bool cursor_is_visible = !g.IO.ConfigInputTextCursorBlink || caret::blink <= 0.0f || ImFmod(state->CursorAnim, caret::blink * 2.0f) < caret::blink;
             ImVec2 cursor_screen_pos = ImTrunc(draw_pos + cursor_offset - draw_scroll);
-            ImRect cursor_screen_rect(cursor_screen_pos.x, cursor_screen_pos.y - g.FontSize + 0.5f, cursor_screen_pos.x + 1.0f, cursor_screen_pos.y - 1.5f);
+            ImRect cursor_screen_rect(cursor_screen_pos.x, cursor_screen_pos.y - g.FontSize + 0.5f, cursor_screen_pos.x + caret::width, cursor_screen_pos.y - 1.5f);
            
-            static std::map <ImGuiID, InputAnim> anim;
-            auto& w = anim.emplace(id, InputAnim{  }).first->second;
-
-            float offset = frame_bb.Min.x + w.v - cursor_screen_rect.Min.x;
-            if (offset != 0) {
-                float direction = (offset > 0) ? -1.0f : 1.0f;
-                w.b = std::abs(offset) / 12.f;
-                w.v += direction * w.b / ImGui::GetIO().Framerate * 200.f;
-            }
-
             if (cursor_is_visible && cursor_screen_rect.Overlaps(clip_rect))
-                draw_window->DrawList->AddRectFilled(
-                    frame_bb.Min + ImVec2(w.v + 2, 8),
-                    frame_bb.Min + ImVec2(w.v + 3, 24),
-                    GetColorU32(ImGuiCol_Text));
+                draw_window->DrawList->AddRectFilled(cursor_screen_rect.Min, cursor_screen_rect.Max, GetColorU32(ImGuiCol_Text));
 
-            // Notify OS of text input position for advanced IME (-1 x offset so that Windows IME can cover our cursor. Bit of an extra nicety.)
             if (!is_readonly)
             {
                 g.PlatformImeData.WantVisible = true;

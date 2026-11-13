@@ -92,6 +92,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
     io.IniFilename = NULL;
     io.LogFilename = NULL;
+    caret::refresh();
 
     ImGui::StyleColorsDark();
 
@@ -371,6 +372,9 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
             SetForegroundWindow(hWnd);
         }
         return 0;
+    case WM_SETTINGCHANGE:
+        caret::refresh();
+        break;
     case WM_DESTROY:
         ::PostQuitMessage(0);
         return 0;

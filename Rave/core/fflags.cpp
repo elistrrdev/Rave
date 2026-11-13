@@ -41,11 +41,6 @@ namespace
         return ok;
     }
 
-    bool isBlank(const std::string& text)
-    {
-        return text.find_first_not_of(" \t\r\n") == std::string::npos;
-    }
-
     std::string number(double n)
     {
         char buf[64];
@@ -108,15 +103,85 @@ namespace
         obj.items.erase(obj.items.begin() + i);
     }
 
-    bool readObject(const std::string& text, json::Value& obj)
+    bool blockEnd(const std::string& text, size_t start, size_t& end)
     {
-        if (isBlank(text))
+        int depth = 0;
+        bool inString = false;
+        for (size_t i = start; i < text.size(); ++i)
         {
-            obj = {};
-            obj.type = json::Value::Type::Object;
-            return true;
+            char c = text[i];
+            if (inString)
+            {
+                if (c == '\\')
+                    ++i;
+                else if (c == '"')
+                    inString = false;
+                continue;
+            }
+            if (c == '"')
+                inString = true;
+            else if (c == '{' || c == '[')
+                ++depth;
+            else if (c == '}' || c == ']')
+            {
+                if (--depth == 0)
+                {
+                    end = i + 1;
+                    return true;
+                }
+            }
         }
-        return json::parse(text, obj) && obj.isObject();
+        return false;
+    }
+
+    bool readBlocks(const std::string& text, std::vector<json::Value>& blocks, std::string& error)
+    {
+        blocks.clear();
+        size_t pos = 0;
+        while (true)
+        {
+            pos = text.find_first_not_of(" \t\r\n", pos);
+            if (pos == std::string::npos)
+                return true;
+            size_t end = 0;
+            json::Value v;
+            if (!blockEnd(text, pos, end) || !json::parse(text.substr(pos, end - pos), v))
+            {
+                error = "This is not valid JSON";
+                return false;
+            }
+            if (!v.isObject())
+            {
+                error = "FFlags must be JSON objects like { \"Flag\": value }";
+                return false;
+            }
+            blocks.push_back(std::move(v));
+            pos = end;
+        }
+    }
+
+    void set(json::Value& obj, const std::string& key, const json::Value& value)
+    {
+        for (size_t i = 0; i < obj.keys.size(); ++i)
+        {
+            if (obj.keys[i] == key)
+            {
+                obj.items[i] = value;
+                return;
+            }
+        }
+        obj.keys.push_back(key);
+        obj.items.push_back(value);
+    }
+
+    json::Value merged(const std::vector<json::Value>& blocks)
+    {
+        json::Value all;
+        all.type = json::Value::Type::Object;
+        for (const json::Value& block : blocks)
+            for (size_t i = 0; i < block.keys.size(); ++i)
+                set(all, block.keys[i], block.items[i]);
+        return all;
     }
 }
 
@@ -171,30 +236,42 @@ const std::vector<fflags::Preset>& fflags::presets()
 
 bool fflags::applyPreset(std::string& text, const Preset& preset, std::string& error)
 {
-    json::Value obj;
-    if (!readObject(text, obj))
+    std::vector<json::Value> blocks;
+    if (!readBlocks(text, blocks, error))
     {
         error = "Fix the JSON in the editor first";
         return false;
     }
-    for (const char* key : preset.replaces)
-        erase(obj, key);
+
+    json::Value added;
+    added.type = json::Value::Type::Object;
     for (const PresetFlag& flag : preset.flags)
     {
         json::Value value;
         value.type = json::Value::Type::String;
         value.string = flag.value;
-        int i = find(obj, flag.name);
-        if (i >= 0)
-            obj.items[i] = value;
-        else
-        {
-            obj.keys.push_back(flag.name);
-            obj.items.push_back(value);
-        }
+        set(added, flag.name, value);
     }
+
+    std::vector<json::Value> kept;
+    for (json::Value& block : blocks)
+    {
+        for (const char* key : preset.replaces)
+            erase(block, key);
+        for (const PresetFlag& flag : preset.flags)
+            erase(block, flag.name);
+        if (!block.items.empty())
+            kept.push_back(std::move(block));
+    }
+    kept.push_back(std::move(added));
+
     text.clear();
-    dump(obj, 0, text);
+    for (size_t i = 0; i < kept.size(); ++i)
+    {
+        if (i)
+            text += "\n";
+        dump(kept[i], 0, text);
+    }
     return true;
 }
 
@@ -208,20 +285,8 @@ std::string fflags::load()
 
 bool fflags::validate(const std::string& text, std::string& error)
 {
-    if (isBlank(text))
-        return true;
-    json::Value v;
-    if (!json::parse(text, v))
-    {
-        error = "This is not valid JSON";
-        return false;
-    }
-    if (!v.isObject())
-    {
-        error = "FFlags must be a JSON object like { \"Flag\": value }";
-        return false;
-    }
-    return true;
+    std::vector<json::Value> blocks;
+    return readBlocks(text, blocks, error);
 }
 
 bool fflags::save(const std::string& text, std::string& error)
@@ -244,10 +309,12 @@ bool fflags::save(const std::string& text, std::string& error)
 
 bool fflags::apply(const std::wstring& versionDir)
 {
-    std::string text = load();
+    std::vector<json::Value> blocks;
     std::string error;
-    if (isBlank(text) || !validate(text, error))
-        text = "{}";
+    std::string text;
+    if (!readBlocks(load(), blocks, error))
+        blocks.clear();
+    dump(merged(blocks), 0, text);
     std::wstring dir = versionDir + L"\\ClientSettings";
     if (!paths::ensureDir(dir))
         return false;

@@ -58,6 +58,20 @@ namespace ui
     void RequestClose();
 }
 
+namespace caret
+{
+    inline float blink = 0.53f;
+    inline float width = 1.f;
+
+    inline void refresh()
+    {
+        UINT ms = GetCaretBlinkTime();
+        blink = (ms == 0 || ms == INFINITE) ? 0.f : ms / 1000.f;
+        DWORD w = 1;
+        width = (SystemParametersInfoW(SPI_GETCARETWIDTH, 0, &w, 0) && w > 0) ? (float)w : 1.f;
+    }
+}
+
 namespace app
 {
     inline HANDLE instanceMutex = nullptr;
