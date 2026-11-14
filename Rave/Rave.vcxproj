@@ -101,20 +101,36 @@
     <ClCompile Include="custom\tab.cpp" />
     <ClCompile Include="core\accounts.cpp" />
     <ClCompile Include="core\fflags.cpp" />
+    <ClCompile Include="core\image.cpp" />
     <ClCompile Include="core\inflate.cpp" />
     <ClCompile Include="core\json.cpp" />
     <ClCompile Include="core\launcher.cpp" />
+    <ClCompile Include="core\mesh.cpp" />
     <ClCompile Include="core\net.cpp" />
     <ClCompile Include="core\paths.cpp" />
+    <ClCompile Include="core\rbxcache.cpp" />
     <ClCompile Include="core\report.cpp" />
     <ClCompile Include="core\roblox.cpp" />
     <ClCompile Include="core\settings.cpp" />
+    <ClCompile Include="core\skins.cpp" />
     <ClCompile Include="core\sysinfo.cpp" />
     <ClCompile Include="core\updater.cpp" />
     <ClCompile Include="core\system.cpp" />
     <ClCompile Include="core\zip.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ui.cpp" />
+    <ClCompile Include="__ext\sqlite\sqlite3.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <SDLCheck>false</SDLCheck>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <PreprocessorDefinitions>SQLITE_OMIT_LOAD_EXTENSION;SQLITE_DQS=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="__ext\zstd\zstddeclib.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <SDLCheck>false</SDLCheck>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <PreprocessorDefinitions>ZSTD_DISABLE_ASM;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
     <ClCompile Include="__ext\freetype\imgui_freetype.cpp" />
     <ClCompile Include="__ext\ImGui\imgui.cpp" />
     <ClCompile Include="__ext\ImGui\imgui_demo.cpp" />
@@ -131,6 +147,11 @@
     <ClInclude Include="version.hpp" />
     <ClInclude Include="core\accounts.hpp" />
     <ClInclude Include="core\fflags.hpp" />
+    <ClInclude Include="core\image.hpp" />
+    <ClInclude Include="core\mesh.hpp" />
+    <ClInclude Include="core\rbxcache.hpp" />
+    <ClInclude Include="core\skins.hpp" />
+    <ClInclude Include="__ext\sqlite\sqlite3.h" />
     <ClInclude Include="core\json.hpp" />
     <ClInclude Include="core\inflate.hpp" />
     <ClInclude Include="core\launcher.hpp" />

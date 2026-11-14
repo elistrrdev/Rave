@@ -3,6 +3,7 @@
 #include "core/fflags.hpp"
 #include "core/launcher.hpp"
 #include "core/settings.hpp"
+#include "core/skins.hpp"
 #include "core/sysinfo.hpp"
 #include "core/system.hpp"
 #include "core/updater.hpp"
@@ -190,6 +191,17 @@ void ui::BeforeLoop(ID3D11Device* dvc) {
 	launcher::setLogger(logger);
 	accounts::setLogger(logger);
 	accounts::load();
+	skins::init([](const std::string& text, skins::Level level) {
+		logType type = logType::info;
+		switch (level)
+		{
+		case skins::Level::Success: type = logType::success; break;
+		case skins::Level::Error: type = logType::error; break;
+		case skins::Level::Warn: type = logType::warn; break;
+		default: break;
+		}
+		items::sendLog(text, type);
+	});
 	launcher::startMonitor();
 	updater::start(window::dx::hwnd);
 }
@@ -317,6 +329,99 @@ namespace addacc
 	}
 }
 
+namespace skinui
+{
+	static bool openRequest = false;
+	static size_t game = 0;
+	static size_t target = 0;
+	static std::string shown;
+	static double lastRefresh = 0;
+	static std::map<std::string, ID3D11ShaderResourceView*> textures;
+	static std::vector<ID3D11ShaderResourceView*> retired;
+	static const char* kPopup = "GAME SKINS";
+
+	static void releaseAll()
+	{
+		for (auto& [key, view] : textures)
+			if (view)
+				retired.push_back(view);
+		textures.clear();
+	}
+
+	static void releaseRetired()
+	{
+		for (ID3D11ShaderResourceView* view : retired)
+			view->Release();
+		retired.clear();
+	}
+
+	static void pickTarget(size_t g, size_t t)
+	{
+		if (g != game || t != target)
+			releaseAll();
+		game = g;
+		target = t;
+		shown = skins::selected(game, target);
+	}
+
+	static void open()
+	{
+		skins::refreshLocal();
+		lastRefresh = GetTime();
+		const auto& list = skins::games();
+		game = game < list.size() ? game : 0;
+		target = game < list.size() && target < list[game].targets.size() ? target : 0;
+		shown = skins::selected(game, target);
+		openRequest = true;
+	}
+
+	static void close()
+	{
+		releaseAll();
+		CloseCurrentPopup();
+	}
+
+	static ID3D11ShaderResourceView* art(bool preview, const std::string& key, bool& failed)
+	{
+		failed = false;
+		std::string id = std::string(preview ? "p|" : "t|") + std::to_string(game) + "|" + std::to_string(target) + "|" + key;
+		auto it = textures.find(id);
+		if (it != textures.end())
+		{
+			failed = it->second == nullptr;
+			return it->second;
+		}
+		img::Rgba pixels;
+		skins::Art state = preview ? skins::preview(game, target, key, pixels) : skins::thumb(game, target, key, pixels);
+		if (state == skins::Art::Pending)
+			return nullptr;
+		ID3D11ShaderResourceView* view = nullptr;
+		if (state == skins::Art::Ready)
+		{
+			gfx::Image image;
+			image.pixels = std::move(pixels.px);
+			image.w = pixels.w;
+			image.h = pixels.h;
+			view = gfx::createTexture(logo::device, image);
+		}
+		textures[id] = view;
+		failed = view == nullptr;
+		return view;
+	}
+
+	static std::string ellipsize(const std::string& text, float width)
+	{
+		if (CalcTextSize(text.c_str()).x <= width)
+			return text;
+		std::string cut = text;
+		while (!cut.empty() && CalcTextSize((cut + "...").c_str()).x > width)
+			cut.pop_back();
+		while (!cut.empty() && cut.back() == ' ')
+			cut.pop_back();
+		return cut + "...";
+	}
+}
+
 static void homePage(ImGuiWindow* window)
 {
 	SetCursorPos({ 20, 100 });
@@ -340,12 +445,18 @@ static void homePage(ImGuiWindow* window)
 			if (items::button(launchLabel() + "###LAUNCH", { c->Size.x - GetCursorPosX() * 2 , 45 }))
 				launcher::launch();
 
+			const float row = c->Size.x - 40;
+			const float third = std::floor((row - 24) / 3);
 			SetCursorPosX(20);
-			if (items::button("FFLAGS EDITOR", { GetItemRectSize().x / 2 - 6, 45 }))
+			if (items::button("FFLAGS EDITOR", { third, 45 }))
 				editor::open();
 
 			SameLine();
-			if (items::button("SETTINGS", { GetItemRectSize().x, 45 }))
+			if (items::button("SKINS", { third, 45 }))
+				skinui::open();
+
+			SameLine();
+			if (items::button("SETTINGS", { row - third * 2 - 24, 45 }))
 				prefs::open();
 
 			PopFont();
@@ -967,6 +1078,235 @@ static void settingsWindow(ImGuiWindow* window)
 	PopStyleVar();
 }
 
+static void weaponRow(size_t index, const skins::Target& t, bool active, bool changed, float width)
+{
+	ImGuiWindow* w = GetCurrentWindow();
+	ImDrawList* dl = w->DrawList;
+	const _V2 pos = w->DC.CursorPos;
+	const _V2 size = { width, 36 };
+
+	bool clicked = InvisibleButton(("##weapon" + std::to_string(index)).c_str(), size);
+	bool hov = IsItemHovered();
+
+	_V4 bg = active ? colors::withAlpha(colors::Main, 0.12f) : hov ? _V4(RGBA(255, 255, 255, 18)) : _V4(RGBA(255, 255, 255, 8));
+	dl->AddRectFilled(pos, pos + size, _CO(bg), 6.f);
+	if (active)
+		dl->AddRect(pos, pos + size, _CO(colors::withAlpha(colors::Main, 0.55f)), 6.f, 0, 1.f);
+
+	const float textMax = width - 12 - (changed ? 22 : 12);
+	std::string label = skinui::ellipsize(t.name, textMax);
+	dl->AddText(pos + _V2(12, (size.y - GetFontSize()) / 2), _CO(active ? colors::Lwhite : colors::Gray), label.c_str());
+	if (changed)
+		dl->AddCircleFilled(pos + _V2(width - 14, size.y / 2), 4.f, _CO(colors::Main), 16);
+
+	if (clicked && !active)
+		skinui::pickTarget(skinui::game, index);
+}
+
+static void skinRow(const skins::Skin& skin, size_t index, bool inUse, bool shownNow, float width)
+{
+	ImGuiWindow* w = GetCurrentWindow();
+	ImDrawList* dl = w->DrawList;
+	const _V2 pos = w->DC.CursorPos;
+	const _V2 size = { width, 40 };
+
+	bool clicked = InvisibleButton(("##skin" + std::to_string(index)).c_str(), size);
+	bool hov = IsItemHovered();
+
+	_V4 bg = inUse ? colors::withAlpha(colors::Main, 0.12f) : shownNow ? _V4(RGBA(255, 255, 255, 22)) : hov ? _V4(RGBA(255, 255, 255, 16)) : _V4(RGBA(255, 255, 255, 8));
+	dl->AddRectFilled(pos, pos + size, _CO(bg), 6.f);
+	if (inUse)
+		dl->AddRect(pos, pos + size, _CO(colors::withAlpha(colors::Main, 0.55f)), 6.f, 0, 1.f);
+	else if (shownNow)
+		dl->AddRect(pos, pos + size, _CO(_V4(RGBA(228, 228, 228, 70))), 6.f, 0, 1.f);
+
+	const _V2 thumbPos = pos + _V2(8, 6);
+	const _V2 thumbSize = { 28, 28 };
+	dl->AddRectFilled(thumbPos, thumbPos + thumbSize, _CO(_V4(RGBA(255, 255, 255, 14))), 4.f);
+	bool failed = false;
+	if (ID3D11ShaderResourceView* tex = skinui::art(false, skin.key, failed))
+		dl->AddImageRounded((ImTextureID)tex, thumbPos, thumbPos + thumbSize, { 0, 0 }, { 1, 1 }, IM_COL32_WHITE, 4.f);
+
+	std::string label = skinui::ellipsize(skin.name, width - 56 - 10);
+	dl->AddText(pos + _V2(46, (size.y - GetFontSize()) / 2), _CO(inUse || shownNow ? colors::Lwhite : colors::Gray), label.c_str());
+
+	if (clicked)
+		skinui::shown = skin.key;
+}
+
+static void skinsWindow(ImGuiWindow* window)
+{
+	skinui::releaseRetired();
+
+	if (skinui::openRequest)
+	{
+		OpenPopup(skinui::kPopup);
+		skinui::openRequest = false;
+	}
+
+	const _V2 size = { 620, 410 };
+	SetNextWindowPos(window->Pos + (window->Size - size) / 2, ImGuiCond_Always);
+	SetNextWindowSize(size, ImGuiCond_Always);
+
+	PushStyleVar(ImGuiStyleVar_WindowPadding, { 0, 0 });
+	if (!BeginPopupModal(skinui::kPopup, nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoSavedSettings))
+	{
+		PopStyleVar();
+		return;
+	}
+
+	if (IsKeyPressed(ImGuiKey_Escape, false))
+	{
+		skinui::close();
+		EndPopup();
+		PopStyleVar();
+		return;
+	}
+
+	if (GetTime() - skinui::lastRefresh > 2.0)
+	{
+		skins::refreshLocal();
+		skinui::lastRefresh = GetTime();
+	}
+
+	ImGuiWindow* popup = GetCurrentWindow();
+	const float inner = popup->Size.x - 40;
+	const auto& games = skins::games();
+
+	SetCursorPos({ 20, 20 });
+	misc::renderMulticolorText({ "GAME ", "SKINS" }, { f.montS[1], f.montS[1] }, { colors::Main, colors::Lwhite });
+
+	PushFont(f.montM[0]);
+
+	if (games.empty())
+	{
+		draw::text("No games found.", { 20, 80 }, colors::Gray);
+		SetCursorPos({ 20, popup->Size.y - 20 - 40 });
+		if (items::button("CLOSE", { inner, 40 }))
+			skinui::close();
+		PopFont();
+		EndPopup();
+		PopStyleVar();
+		return;
+	}
+
+	{
+		const float gap = 10;
+		float x = popup->Size.x - 20;
+		for (size_t i = games.size(); i-- > 0;)
+		{
+			std::string label = games[i].name;
+			for (char& ch : label)
+				ch = (char)toupper((unsigned char)ch);
+			float wBtn = std::max(120.f, CalcTextSize(label.c_str()).x + 32);
+			x -= wBtn;
+			SetCursorPos({ x, 16 });
+			if (items::choice(label + "##game" + std::to_string(i), skinui::game == i, { wBtn, 32 }) && skinui::game != i)
+				skinui::pickTarget(i, 0);
+			x -= gap;
+		}
+	}
+
+	const skins::Game& g = games[skinui::game];
+	if (skinui::target >= g.targets.size())
+		skinui::pickTarget(skinui::game, 0);
+
+	const float top = 64;
+	const float listH = 254;
+	const float colW = 180;
+	const float gap = 12;
+	const float previewX = 20 + colW * 2 + gap * 2;
+	const float previewW = popup->Size.x - 20 - previewX;
+
+	SetCursorPos({ 20, top });
+	misc::child2("SKIN_WEAPONS", { colW, listH });
+	{
+		PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0, 6 });
+		SetCursorPos({ 0, 0 });
+		for (size_t i = 0; i < g.targets.size(); ++i)
+			weaponRow(i, g.targets[i], i == skinui::target, !skins::selected(skinui::game, i).empty(), colW);
+		PopStyleVar();
+	}
+	EndChild();
+
+	const std::string inUse = skins::selected(skinui::game, skinui::target);
+	std::vector<skins::Skin> list = skins::list(skinui::game, skinui::target);
+	bool shownExists = false;
+	for (const auto& s : list)
+		if (s.key == skinui::shown)
+			shownExists = true;
+	if (!shownExists)
+		skinui::shown = inUse;
+
+	SetCursorPos({ 20 + colW + gap, top });
+	misc::child2("SKIN_LIST", { colW, listH });
+	{
+		PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0, 6 });
+		SetCursorPos({ 0, 0 });
+		for (size_t i = 0; i < list.size(); ++i)
+			skinRow(list[i], i, list[i].key == inUse, list[i].key == skinui::shown, colW);
+		PopStyleVar();
+	}
+	EndChild();
+
+	const skins::Skin* current = nullptr;
+	for (const auto& s : list)
+		if (s.key == skinui::shown)
+			current = &s;
+
+	const _V2 imgPos = popup->Pos + _V2(previewX, top);
+	const _V2 imgSize = { previewW, std::floor(previewW * 264.f / 432.f) };
+	popup->DrawList->AddRectFilled(imgPos, imgPos + imgSize, _CO(_V4(RGBA(255, 255, 255, 12))), 8.f);
+	if (current)
+	{
+		bool failed = false;
+		ID3D11ShaderResourceView* tex = skinui::art(true, current->key, failed);
+		if (tex)
+			popup->DrawList->AddImageRounded((ImTextureID)tex, imgPos, imgPos + imgSize, { 0, 0 }, { 1, 1 }, IM_COL32_WHITE, 8.f);
+		else
+		{
+			const char* note = failed ? "No preview" : "...";
+			_V2 ns = _C(note);
+			popup->DrawList->AddText(imgPos + (imgSize - ns) / 2, _CO(colors::Gray), note);
+		}
+
+		float y = top + imgSize.y + 14;
+		PushFont(f.montM[1]);
+		draw::text(skinui::ellipsize(current->name, previewW), { previewX, y }, colors::Lwhite);
+		PopFont();
+		y += 26;
+		draw::text(skinui::ellipsize(current->source, previewW), { previewX, y }, colors::Gray);
+		y += 22;
+		bool active = current->key == inUse;
+		draw::text(active ? "In use" : "Not in use", { previewX, y }, active ? colors::Main : colors::Info);
+
+		SetCursorPos({ previewX, top + listH - 40 });
+		if (active)
+			items::choice("IN USE##useskin", true, { previewW, 40 });
+		else if (items::button((current->kind == skins::Kind::Original ? std::string("USE ORIGINAL") : std::string("USE THIS SKIN")) + "##useskin", { previewW, 40 }))
+			skins::select(skinui::game, skinui::target, current->key);
+	}
+
+	std::string status = skins::status();
+	if (status.empty())
+		status = "Skins replace textures in your Roblox cache. Only you can see them.";
+	draw::text(skinui::ellipsize(status, inner), { 20, top + listH + 12 }, colors::Gray);
+
+	const float folderW = 170;
+	SetCursorPos({ 20, popup->Size.y - 20 - 40 });
+	if (items::choice("SKINS FOLDER", false, { folderW, 40 }, 0.f))
+		skins::openFolder(skinui::game);
+
+	SetCursorPos({ 20 + folderW + 12, popup->Size.y - 20 - 40 });
+	if (items::button("CLOSE", { inner - folderW - 12, 40 }))
+		skinui::close();
+
+	PopFont();
+
+	EndPopup();
+	PopStyleVar();
+}
+
 void ui::Render() {
 	static Tab tab = Tab::Home;
 	const Tab shownTab = tab;
@@ -1017,6 +1357,7 @@ void ui::Render() {
 		fflagsEditor(window);
 		settingsWindow(window);
 		addAccountWindow(window);
+		skinsWindow(window);
 	}
 	ImGui::End();
 }

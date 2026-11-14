@@ -1,0 +1,342 @@
+{
+  "games": [
+    {
+      "id": "prison-life",
+      "name": "Prison Life",
+      "placeId": "155615604",
+      "source": "Prison Life textures, Rave colors",
+      "themes": true,
+      "targets": [
+        {
+          "id": "m4a1",
+          "name": "M4A1",
+          "textures": [
+            "84696601038104"
+          ],
+          "mesh": 211,
+          "texture": 212
+        },
+        {
+          "id": "m9",
+          "name": "M9",
+          "textures": [
+            "100649571955287"
+          ],
+          "mesh": 213,
+          "texture": 214
+        },
+        {
+          "id": "remington",
+          "name": "Remington 870",
+          "textures": [
+            "134695297080980"
+          ],
+          "mesh": 215,
+          "texture": 216
+        },
+        {
+          "id": "ak47",
+          "name": "AK-47",
+          "textures": [
+            "82603222461633"
+          ],
+          "texture": 217
+        },
+        {
+          "id": "mp5",
+          "name": "MP5",
+          "textures": [
+            "74453061964221"
+          ],
+          "texture": 218
+        },
+        {
+          "id": "revolver",
+          "name": "Revolver",
+          "textures": [
+            "106990054205648"
+          ],
+          "texture": 219
+        },
+        {
+          "id": "taser",
+          "name": "Taser",
+          "textures": [
+            "82337709"
+          ],
+          "texture": 220
+        },
+        {
+          "id": "riot-shield",
+          "name": "Riot Shield",
+          "textures": [
+            "82265116"
+          ],
+          "texture": 221
+        },
+        {
+          "id": "c4",
+          "name": "C4",
+          "textures": [
+            "87643737848206"
+          ],
+          "texture": 222
+        }
+      ],
+      "skins": []
+    },
+    {
+      "id": "jailbreak",
+      "name": "Jailbreak",
+      "placeId": "606849621",
+      "source": "Fleasion PreJSON by CfwSky",
+      "themes": false,
+      "targets": [
+        {
+          "id": "pistol",
+          "name": "Pistol",
+          "textures": [
+            "16647913398"
+          ]
+        },
+        {
+          "id": "ak47",
+          "name": "AK47",
+          "textures": [
+            "16647909271"
+          ]
+        },
+        {
+          "id": "rifle",
+          "name": "Rifle",
+          "textures": [
+            "16647917663"
+          ]
+        },
+        {
+          "id": "shotgun",
+          "name": "Shotgun",
+          "textures": [
+            "16647919326"
+          ]
+        },
+        {
+          "id": "forcefield-launcher",
+          "name": "Forcefield Launcher",
+          "textures": [
+            "16647912007"
+          ]
+        },
+        {
+          "id": "rocket-launcher",
+          "name": "Rocket Launcher",
+          "textures": [
+            "16647918515"
+          ]
+        },
+        {
+          "id": "revolver",
+          "name": "Revolver",
+          "textures": [
+            "16647917031"
+          ]
+        },
+        {
+          "id": "flintlock",
+          "name": "Flintlock",
+          "textures": [
+            "16647911211"
+          ]
+        },
+        {
+          "id": "sniper",
+          "name": "Sniper",
+          "textures": [
+            "16647920120"
+          ]
+        },
+        {
+          "id": "plasma-pistol",
+          "name": "Plasma Pistol",
+          "textures": [
+            "16647916237"
+          ]
+        },
+        {
+          "id": "plasma-shotgun",
+          "name": "Plasma Shotgun",
+          "textures": [
+            "1720666728"
+          ]
+        },
+        {
+          "id": "sword",
+          "name": "Sword",
+          "textures": [
+            "700374040"
+          ]
+        },
+        {
+          "id": "taser",
+          "name": "Taser",
+          "textures": [
+            "880310770"
+          ]
+        },
+        {
+          "id": "uzi",
+          "name": "Uzi",
+          "textures": [
+            "16647920802"
+          ]
+        },
+        {
+          "id": "road-spikes",
+          "name": "Road Spikes",
+          "textures": [
+            "4572537288"
+          ]
+        },
+        {
+          "id": "handcuffs",
+          "name": "Handcuffs",
+          "textures": [
+            "700374045"
+          ]
+        }
+      ],
+      "skins": [
+        {
+          "target": "pistol",
+          "name": "Rainbow",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Rainbow/PistolRainbow.png"
+        },
+        {
+          "target": "ak47",
+          "name": "Rainbow",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Rainbow/AKRainbow.png"
+        },
+        {
+          "target": "rifle",
+          "name": "Rainbow",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Rainbow/RifleRainbow.png"
+        },
+        {
+          "target": "shotgun",
+          "name": "Rainbow",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Rainbow/ShotgunRainbow.png"
+        },
+        {
+          "target": "forcefield-launcher",
+          "name": "Rainbow",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Rainbow/ForcefieldLauncherRainbow.png"
+        },
+        {
+          "target": "rocket-launcher",
+          "name": "Rainbow",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Rainbow/RocketLauncherRainbow.png"
+        },
+        {
+          "target": "revolver",
+          "name": "Rainbow",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Rainbow/RevolverRainbow.png"
+        },
+        {
+          "target": "flintlock",
+          "name": "Rainbow",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Rainbow/FlintlockRainbow.png"
+        },
+        {
+          "target": "sniper",
+          "name": "Rainbow",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Rainbow/SniperRainbow.png"
+        },
+        {
+          "target": "plasma-pistol",
+          "name": "Rainbow",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Rainbow/PlasmaPistolRainbow.png"
+        },
+        {
+          "target": "pistol",
+          "name": "Black and White",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Black/Pistol2.png"
+        },
+        {
+          "target": "ak47",
+          "name": "Black and White",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Black/AK2.png"
+        },
+        {
+          "target": "rifle",
+          "name": "Black and White",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Black/Rifle2.png"
+        },
+        {
+          "target": "shotgun",
+          "name": "Black and White",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Black/Shotgun2.png"
+        },
+        {
+          "target": "forcefield-launcher",
+          "name": "Black and White",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Black/ForcefieldLauncher2.png"
+        },
+        {
+          "target": "rocket-launcher",
+          "name": "Black and White",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Black/RocketLauncher2.png"
+        },
+        {
+          "target": "revolver",
+          "name": "Black and White",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Black/revolver2.png"
+        },
+        {
+          "target": "flintlock",
+          "name": "Black and White",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Black/flintlock2.png"
+        },
+        {
+          "target": "sniper",
+          "name": "Black and White",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Black/sniper2.png"
+        },
+        {
+          "target": "plasma-pistol",
+          "name": "Black and White",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Black/PlasmaPistol2.png"
+        },
+        {
+          "target": "handcuffs",
+          "name": "Black and White",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Black/Handcuffs.png"
+        },
+        {
+          "target": "plasma-shotgun",
+          "name": "Black and White",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Black/PlasmaShotgun.png"
+        },
+        {
+          "target": "sword",
+          "name": "Black and White",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Black/Sword.png"
+        },
+        {
+          "target": "taser",
+          "name": "Black and White",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Black/Taser.png"
+        },
+        {
+          "target": "road-spikes",
+          "name": "Black and White",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Black/TireSpikes.png"
+        },
+        {
+          "target": "uzi",
+          "name": "Black and White",
+          "url": "https://raw.githubusercontent.com/CfwSky/Jailbreak-Floppr/main/decals/JBGuns/Black/Uzi.png"
+        }
+      ]
+    }
+  ]
+}

@@ -4,6 +4,7 @@
 #include "report.hpp"
 #include "roblox.hpp"
 #include "settings.hpp"
+#include "skins.hpp"
 #include "system.hpp"
 #include <windows.h>
 #include <objbase.h>
@@ -193,6 +194,7 @@ namespace
         }
 
         currentTask = launcher::Task::Launching;
+        skins::applyBeforeLaunch();
         if (!fflags::apply(roblox::versionDir(latest.guid)))
             log("Could not apply the FFlags", launcher::LogLevel::Warn);
 

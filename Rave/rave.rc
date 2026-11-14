@@ -5,6 +5,20 @@
 2 ICON "../assets/logo.ico"
 3 RCDATA "../assets/logo.png"
 
+200 RCDATA "../games/games.json"
+211 RCDATA "../games/prison-life/textures/M4 MESH.obj"
+212 RCDATA "../games/prison-life/textures/M4 TEXTURE.png"
+213 RCDATA "../games/prison-life/textures/PISTOL MESH.obj"
+214 RCDATA "../games/prison-life/textures/Pistol texture.png"
+215 RCDATA "../games/prison-life/textures/SHOTGUN MESH.obj"
+216 RCDATA "../games/prison-life/textures/SHOTGUN TEXTURE.png"
+217 RCDATA "../games/prison-life/textures/AK47 TEXTURE.png"
+218 RCDATA "../games/prison-life/textures/MP5 TEXTURE.png"
+219 RCDATA "../games/prison-life/textures/REVOLVER TEXTURE.png"
+220 RCDATA "../games/prison-life/textures/TASER TEXTURE.png"
+221 RCDATA "../games/prison-life/textures/RIOT SHIELD TEXTURE.png"
+222 RCDATA "../games/prison-life/textures/C4 TEXTURE.png"
+
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION RAVE_VERSION_MAJOR,RAVE_VERSION_MINOR,0,0
  PRODUCTVERSION RAVE_VERSION_MAJOR,RAVE_VERSION_MINOR,0,0
