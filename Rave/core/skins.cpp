@@ -48,7 +48,9 @@ namespace
         std::string target;
         std::string name;
         int res = 0;
+        int meshRes = 0;
         std::string url;
+        std::string source;
     };
 
     struct GameData
@@ -71,6 +73,7 @@ namespace
 
     std::vector<skins::Game> catalog;
     std::vector<GameData> extra;
+    std::map<std::string, std::set<std::string>> seeds;
     skins::Logger logger;
 
     std::mutex stateLock;
@@ -369,6 +372,19 @@ namespace
                 for (const json::Value& id : t["textures"].items)
                     if (id.isString() && !id.str().empty())
                         target.textures.push_back(id.str());
+                for (const json::Value& id : t["meshes"].items)
+                    if (id.isString() && !id.str().empty())
+                        target.meshes.push_back(id.str());
+                for (const char* field : { "texturePrints", "meshPrints" })
+                {
+                    const std::vector<std::string>& ids = std::string(field) == "texturePrints" ? target.textures : target.meshes;
+                    for (const json::Value& p : t[field].items)
+                        if (p.isString() && !ids.empty())
+                            for (const std::string& id : ids)
+                                seeds[id].insert(p.str());
+                }
+                target.meshVerts = t["meshVerts"].str();
+                target.ktx2 = t["format"].str() == "ktx2";
                 target.meshRes = (int)t["mesh"].number;
                 target.textureRes = (int)t["texture"].number;
                 if (!target.id.empty() && !target.textures.empty())
@@ -380,7 +396,9 @@ namespace
                 f.target = s["target"].str();
                 f.name = s["name"].str();
                 f.res = (int)s["res"].number;
+                f.meshRes = (int)s["meshRes"].number;
                 f.url = s["url"].str();
+                f.source = s["source"].str();
                 if (!f.target.empty() && !f.name.empty() && (f.res > 0 || allowedDownload(f.url)))
                     data.files.push_back(f);
             }
@@ -398,9 +416,13 @@ namespace
         json::Value root;
         if (!readFile(statePath(), text) || !json::parse(text, root))
             return;
+        std::set<std::string> slots;
+        for (const skins::Game& g : catalog)
+            for (const skins::Target& t : g.targets)
+                slots.insert(g.id + "/" + t.id);
         const json::Value& sel = root["selected"];
         for (size_t i = 0; i < sel.keys.size(); ++i)
-            if (sel.items[i].isString() && !sel.items[i].str().empty())
+            if (sel.items[i].isString() && !sel.items[i].str().empty() && slots.count(sel.keys[i]))
                 chosen[sel.keys[i]] = sel.items[i].str();
         const json::Value& kn = root["known"];
         for (size_t i = 0; i < kn.keys.size(); ++i)
@@ -687,7 +709,52 @@ namespace
         size_t game;
         size_t target;
         std::string skin;
+        bool mesh = false;
     };
+
+    const FileSkin* fileSkin(size_t game, size_t target, const std::string& key)
+    {
+        if (game >= extra.size() || target >= catalog[game].targets.size())
+            return nullptr;
+        const std::string& id = catalog[game].targets[target].id;
+        for (const FileSkin& f : extra[game].files)
+        {
+            if (f.target != id)
+                continue;
+            if ((f.res > 0 && key == "res:" + std::to_string(f.res)) || (!f.url.empty() && key == "url:" + f.url))
+                return &f;
+        }
+        return nullptr;
+    }
+
+    std::string unhex(const std::string& hex)
+    {
+        std::string out;
+        for (size_t i = 0; i + 1 < hex.size(); i += 2)
+            out += (char)strtol(hex.substr(i, 2).c_str(), nullptr, 16);
+        return out;
+    }
+
+    std::vector<size_t> findMesh(rbxcache::Store& store, const std::vector<rbxcache::Entry>& entries, const std::set<std::string>& owned, const std::string& verts)
+    {
+        std::vector<size_t> out;
+        std::string pattern = unhex(verts);
+        if (pattern.size() < 24)
+            return out;
+        for (size_t i = 0; i < entries.size(); ++i)
+        {
+            const rbxcache::Entry& e = entries[i];
+            if (owned.count(e.id) || e.bodyLen < 64 || e.bodyLen > (32u << 20))
+                continue;
+            std::string head;
+            if (!store.readHead(e, head, 12) || head.compare(0, 8, "version ") != 0)
+                continue;
+            std::string body;
+            if (store.readBody(e, body) && body.find(pattern) != std::string::npos)
+                out.push_back(i);
+        }
+        return out;
+    }
 
     bool skinBytes(const Want& want, std::string& out)
     {
@@ -726,11 +793,17 @@ namespace
                     if (it == chosen.end() || it->second.empty())
                         continue;
                     for (const std::string& tex : catalog[g].targets[t].textures)
-                        wanted[tex] = { g, t, it->second };
+                        wanted[tex] = { g, t, it->second, false };
+                    const FileSkin* f = fileSkin(g, t, it->second);
+                    if (f && f->meshRes > 0)
+                        for (const std::string& m : catalog[g].targets[t].meshes)
+                            wanted[m] = { g, t, it->second, true };
                 }
             recs = records;
             knownNow = known;
         }
+        for (const auto& [asset, set] : seeds)
+            knownNow[asset].insert(set.begin(), set.end());
 
         auto finish = [&](bool ok) {
             if (SUCCEEDED(com))
@@ -811,7 +884,13 @@ namespace
             }
             owned.insert(r.entry);
             keep.push_back(r);
-            if (w->second.skin != r.skin)
+            bool wrongFormat = false;
+            if (!w->second.mesh && catalog[w->second.game].targets[w->second.target].ktx2)
+            {
+                std::string head;
+                wrongFormat = store.readHead(e, head, 64) && img::probe(head.data(), head.size()).kind != img::Kind::Ktx2;
+            }
+            if (w->second.skin != r.skin || wrongFormat)
                 toWrite[r.texture].push_back(it->second);
         }
 
@@ -844,10 +923,30 @@ namespace
         std::vector<std::string> missing;
         if (!unresolved.empty() && scan)
         {
-            setStatus("Looking for the original textures in the Roblox cache");
-            std::vector<Candidate> list = candidates(store, entries, owned);
+            setStatus("Looking for the originals in the Roblox cache");
+            std::vector<Candidate> list;
+            bool listed = false;
             for (const std::string& tex : unresolved)
             {
+                const Want& w = wanted[tex];
+                if (w.mesh)
+                {
+                    std::vector<size_t> found = findMesh(store, entries, owned, catalog[w.game].targets[w.target].meshVerts);
+                    for (size_t idx : found)
+                    {
+                        owned.insert(entries[idx].id);
+                        toWrite[tex].push_back(idx);
+                        knownNow[tex].insert(fingerprint(entries[idx].bodyLen, entries[idx].bodyHash));
+                    }
+                    if (found.empty())
+                        missing.push_back(tex);
+                    continue;
+                }
+                if (!listed)
+                {
+                    list = candidates(store, entries, owned);
+                    listed = true;
+                }
                 img::Rgba thumb;
                 std::vector<size_t> found;
                 if (thumbnail(tex, thumb))
@@ -866,22 +965,37 @@ namespace
         }
 
         std::map<std::string, std::string> fileCache;
+        int writtenMeshes = 0;
         for (auto& [tex, list] : toWrite)
         {
             const Want& want = wanted[tex];
             const std::string& key = want.skin;
-            const Theme* theme = key.rfind("theme:", 0) == 0 ? themeByName(key.substr(6)) : nullptr;
+            const bool ktx2 = !want.mesh && catalog[want.game].targets[want.target].ktx2;
+            const Theme* theme = !want.mesh && key.rfind("theme:", 0) == 0 ? themeByName(key.substr(6)) : nullptr;
             std::string shared;
             if (!theme)
             {
-                auto fc = fileCache.find(key);
+                std::string cacheKey = key + (want.mesh ? "|mesh" : ktx2 ? "|ktx2" : "|png");
+                auto fc = fileCache.find(cacheKey);
                 if (fc == fileCache.end())
                 {
                     std::string bytes;
-                    img::Rgba check;
-                    if (!skinBytes(want, bytes) || !img::decodePng(bytes.data(), bytes.size(), check))
-                        bytes.clear();
-                    fc = fileCache.emplace(key, bytes).first;
+                    if (want.mesh)
+                    {
+                        const FileSkin* f = fileSkin(want.game, want.target, key);
+                        mesh::Mesh check;
+                        if (!f || !resource(f->meshRes, bytes) || !mesh::parseRbx(bytes, check))
+                            bytes.clear();
+                    }
+                    else
+                    {
+                        img::Rgba check;
+                        if (!skinBytes(want, bytes) || !img::decodePng(bytes.data(), bytes.size(), check))
+                            bytes.clear();
+                        else if (ktx2 && !img::encodeKtx2(check, bytes))
+                            bytes.clear();
+                    }
+                    fc = fileCache.emplace(cacheKey, bytes).first;
                 }
                 shared = fc->second;
                 if (shared.empty())
@@ -907,7 +1021,10 @@ namespace
                 if (theme)
                 {
                     img::Rgba pixels;
-                    if (!img::decode(original.data(), original.size(), pixels) || !img::encodePng(recolor(pixels, *theme), body))
+                    bool encoded = img::decode(original.data(), original.size(), pixels);
+                    if (encoded)
+                        encoded = ktx2 ? img::encodeKtx2(recolor(pixels, *theme), body) : img::encodePng(recolor(pixels, *theme), body);
+                    if (!encoded)
                     {
                         ++failed;
                         continue;
@@ -920,7 +1037,10 @@ namespace
                 }
                 keep.erase(std::remove_if(keep.begin(), keep.end(), [&](const Record& r) { return r.entry == e.id; }), keep.end());
                 keep.push_back({ e.id, tex, key, e.bodyHash });
-                ++written;
+                if (want.mesh)
+                    ++writtenMeshes;
+                else
+                    ++written;
             }
         }
 
@@ -932,12 +1052,18 @@ namespace
             saveState();
         }
 
-        if (written)
-            log("Skins applied to " + std::to_string(written) + (written == 1 ? " texture" : " textures") + " in the Roblox cache", skins::Level::Success);
+        auto plural = [](int n, const char* one, const char* many) { return std::to_string(n) + " " + (n == 1 ? one : many); };
+        if (written || writtenMeshes)
+        {
+            std::string what = written ? plural(written, "texture", "textures") : "";
+            if (writtenMeshes)
+                what += (what.empty() ? "" : " and ") + plural(writtenMeshes, "model", "models");
+            log("Skins applied to " + what + " in the Roblox cache", skins::Level::Success);
+        }
         if (restored)
-            log(std::to_string(restored) + (restored == 1 ? " texture" : " textures") + " set back to the original", skins::Level::Info);
+            log(plural(restored, "file", "files") + " set back to the original", skins::Level::Info);
         if (failed)
-            log("Skins: " + std::to_string(failed) + " texture" + (failed == 1 ? "" : "s") + " could not be written", skins::Level::Error);
+            log("Skins: " + plural(failed, "file", "files") + " could not be written", skins::Level::Error);
 
         std::set<std::string> missingNames;
         for (const std::string& tex : missing)
@@ -1014,7 +1140,7 @@ namespace
             return theme ? recolor(base, *theme) : img::Rgba{};
         }
         std::string bytes;
-        Want want{ game, target, key };
+        Want want{ game, target, key, false };
         if (skinBytes(want, bytes))
             img::decodePng(bytes.data(), bytes.size(), base);
         return base;
@@ -1045,25 +1171,27 @@ namespace
                 if (!image.empty())
                 {
                     const skins::Target& t = catalog[game].targets[target];
-                    if (!isPreview)
-                        out = img::fit(image, kThumbSide, kThumbSide, 0);
-                    else if (t.meshRes)
+                    const FileSkin* f = fileSkin(game, target, key);
+                    int meshId = f && f->meshRes > 0 ? f->meshRes : t.meshRes;
+                    const mesh::Mesh* model = nullptr;
+                    if (meshId)
                     {
-                        auto m = meshes.find(t.meshRes);
+                        auto m = meshes.find(meshId);
                         if (m == meshes.end())
                         {
                             mesh::Mesh parsed;
-                            std::string obj;
-                            if (resource(t.meshRes, obj))
-                                mesh::parseObj(obj, parsed);
-                            m = meshes.emplace(t.meshRes, std::move(parsed)).first;
+                            std::string data;
+                            if (resource(meshId, data))
+                                mesh::parse(data, parsed);
+                            m = meshes.emplace(meshId, std::move(parsed)).first;
                         }
-                        out = m->second.empty() ? img::fit(image, kPreviewW, kPreviewH, 24) : mesh::render(m->second, image, kPreviewW, kPreviewH);
+                        if (!m->second.empty())
+                            model = &m->second;
                     }
+                    if (!isPreview)
+                        out = model ? mesh::render(*model, image, kThumbSide, kThumbSide) : img::fit(image, kThumbSide, kThumbSide, 0);
                     else
-                    {
-                        out = img::fit(image, kPreviewW, kPreviewH, 24);
-                    }
+                        out = model ? mesh::render(*model, image, kPreviewW, kPreviewH) : img::fit(image, kPreviewW, kPreviewH, 24);
                 }
             }
 
@@ -1123,18 +1251,19 @@ std::vector<skins::Skin> skins::list(size_t game, size_t target)
     const Game& g = catalog[game];
     const Target& t = g.targets[target];
     out.push_back({ "", "Original", g.name + " original", Kind::Original });
-    if (g.themes)
-        for (const Theme& th : kThemes)
-            out.push_back({ std::string("theme:") + th.name, th.name, "Rave color", Kind::Theme });
     for (const FileSkin& f : extra[game].files)
     {
         if (f.target != t.id)
             continue;
+        std::string source = f.source.empty() ? g.source : f.source;
         if (f.res > 0)
-            out.push_back({ "res:" + std::to_string(f.res), f.name, g.source, Kind::Embedded });
+            out.push_back({ "res:" + std::to_string(f.res), f.name, source, Kind::Embedded, f.meshRes > 0 });
         else
-            out.push_back({ "url:" + f.url, f.name, g.source, Kind::Url });
+            out.push_back({ "url:" + f.url, f.name, source, Kind::Url });
     }
+    if (g.themes)
+        for (const Theme& th : kThemes)
+            out.push_back({ std::string("theme:") + th.name, th.name, "Rave color", Kind::Theme });
     std::lock_guard<std::mutex> lk(localLock);
     auto it = localFiles.find(slotKey(game, target));
     if (it != localFiles.end())

@@ -14,7 +14,18 @@
             "84696601038104"
           ],
           "mesh": 211,
-          "texture": 212
+          "texture": 212,
+          "texturePrints": [
+            "1199:2208716238",
+            "915:2704130863"
+          ],
+          "meshes": [
+            "89309227654647"
+          ],
+          "meshPrints": [
+            "100804:626936747"
+          ],
+          "meshVerts": "f2db823fd7516e400000c841f2db823fb5fe89400000c841c3af8f3c395097400000c8412d5a8a3fd19380400000c841"
         },
         {
           "id": "m9",
@@ -23,7 +34,18 @@
             "100649571955287"
           ],
           "mesh": 213,
-          "texture": 214
+          "texture": 214,
+          "texturePrints": [
+            "1016:243052547",
+            "730:1265112270"
+          ],
+          "meshes": [
+            "110631186758351"
+          ],
+          "meshPrints": [
+            "39047:3911416360"
+          ],
+          "meshVerts": "750e003f5dc457410000c841a553a13f284a55410000c8417fc6383f35e85d410000c841d869603fa6be51410000c841"
         },
         {
           "id": "remington",
@@ -32,7 +54,18 @@
             "134695297080980"
           ],
           "mesh": 215,
-          "texture": 216
+          "texture": 216,
+          "texturePrints": [
+            "1101:2203713616",
+            "838:3849203594"
+          ],
+          "meshes": [
+            "85472077740638"
+          ],
+          "meshPrints": [
+            "40625:3956416242"
+          ],
+          "meshVerts": "d925a5bf59cf72c0daddc5c1c33736bfca16933fffffc7c1c33736bfe73596c0647ac5c1d925a5bf1dd1d23e86aec7c1"
         },
         {
           "id": "ak47",
@@ -40,15 +73,18 @@
           "textures": [
             "82603222461633"
           ],
-          "texture": 217
-        },
-        {
-          "id": "mp5",
-          "name": "MP5",
-          "textures": [
-            "74453061964221"
+          "texture": 217,
+          "texturePrints": [
+            "1010:1863829474",
+            "737:3117179255"
           ],
-          "texture": 218
+          "meshes": [
+            "71100855161498"
+          ],
+          "meshPrints": [
+            "62631:239589886"
+          ],
+          "meshVerts": "73cbea3ea5258b400000c8c1399e6b3f7b8bfcbe0000c8c13ac5093fcc659cbf0000c8c1399e6b3f57a975400000c8c1"
         },
         {
           "id": "revolver",
@@ -56,7 +92,18 @@
           "textures": [
             "106990054205648"
           ],
-          "texture": 219
+          "texture": 219,
+          "texturePrints": [
+            "1140:2663509872",
+            "733:842408725"
+          ],
+          "meshes": [
+            "117805356475599"
+          ],
+          "meshPrints": [
+            "35035:1338252003"
+          ],
+          "meshVerts": "eab9e7a51026503f3c841040158be1bd44d1493f3c8410408353c3bd94b83b3f3c8410405347bcbd78b7583f3c841040"
         },
         {
           "id": "taser",
@@ -64,7 +111,11 @@
           "textures": [
             "82337709"
           ],
-          "texture": 220
+          "texture": 220,
+          "texturePrints": [
+            "13795:202012879"
+          ],
+          "format": "ktx2"
         },
         {
           "id": "riot-shield",
@@ -72,7 +123,11 @@
           "textures": [
             "82265116"
           ],
-          "texture": 221
+          "texture": 221,
+          "texturePrints": [
+            "34935:635038846"
+          ],
+          "format": "ktx2"
         },
         {
           "id": "c4",
@@ -80,10 +135,91 @@
           "textures": [
             "87643737848206"
           ],
-          "texture": 222
+          "texture": 222,
+          "texturePrints": [
+            "920:749053858"
+          ]
         }
       ],
-      "skins": []
+      "skins": [
+        {
+          "target": "m4a1",
+          "name": "Dark Purple",
+          "res": 231,
+          "meshRes": 230,
+          "source": "Prison Life community, made by iitkenny"
+        },
+        {
+          "target": "m9",
+          "name": "Desert Eagle",
+          "res": 233,
+          "meshRes": 232,
+          "source": "Prison Life community, made by iitkenny"
+        },
+        {
+          "target": "remington",
+          "name": "Silver",
+          "res": 235,
+          "meshRes": 234,
+          "source": "Prison Life community, made by iitkenny"
+        },
+        {
+          "target": "ak47",
+          "name": "Silver",
+          "res": 237,
+          "meshRes": 236,
+          "source": "Prison Life community, made by iitkenny"
+        },
+        {
+          "target": "ak47",
+          "name": "Oni Vandal Red",
+          "res": 239,
+          "meshRes": 238,
+          "source": "Prison Life community, made by iitkenny"
+        },
+        {
+          "target": "ak47",
+          "name": "Oni Vandal White",
+          "res": 240,
+          "meshRes": 238,
+          "source": "Prison Life community, made by iitkenny"
+        },
+        {
+          "target": "ak47",
+          "name": "Oni Vandal Black",
+          "res": 241,
+          "meshRes": 238,
+          "source": "Prison Life community, made by iitkenny"
+        },
+        {
+          "target": "ak47",
+          "name": "Oni Vandal Green",
+          "res": 242,
+          "meshRes": 238,
+          "source": "Prison Life community, made by iitkenny"
+        },
+        {
+          "target": "revolver",
+          "name": "Black",
+          "res": 244,
+          "meshRes": 243,
+          "source": "Prison Life community, made by iitkenny"
+        },
+        {
+          "target": "revolver",
+          "name": "Gold",
+          "res": 245,
+          "meshRes": 243,
+          "source": "Prison Life community, made by iitkenny"
+        },
+        {
+          "target": "revolver",
+          "name": "Silver",
+          "res": 246,
+          "meshRes": 243,
+          "source": "Prison Life community, made by iitkenny"
+        }
+      ]
     },
     {
       "id": "jailbreak",

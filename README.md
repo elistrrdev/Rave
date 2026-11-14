@@ -12,7 +12,7 @@ Rave keeps its own copy of the Roblox client in `%LOCALAPPDATA%\Rave`. Every tim
 
 - **Accounts** - add your Roblox accounts with Quick Log In (code or QR) or a `.ROBLOSECURITY` cookie, pick one and Roblox opens already signed in. Accounts are stored encrypted with Windows DPAPI, so only your Windows user can read them. Your password is never asked for.
 - **FFlags editor** - write, import and export FFlags as JSON, or switch on presets like Potato mode, no grass or Vulkan with one click. Presets only use flags Roblox still accepts. Your flags are applied every time Roblox starts, even after an update.
-- **Skins** - give your weapons a new look in Prison Life (Rave colors or skins you add yourself) and Jailbreak (community skins from the Fleasion catalog), with a 3D or image preview of every skin. Rave swaps the textures in your local Roblox cache, so only you see them, and choosing Original puts the real textures back.
+- **Skins** - give your weapons a new look in Prison Life (community skins with their own 3D models, Rave colors or skins you add yourself) and Jailbreak (community skins from the Fleasion catalog), with a 3D or image preview of every skin. Rave swaps the textures and models in your local Roblox cache, so only you see them, and choosing Original puts the real textures back.
 - **Settings** - keep Rave open, minimize it or hide it while Roblox runs (it comes back when Roblox closes), and choose an accent color.
 - **Info** - Rave and Roblox versions, your specs and a HardwareID that never leaves your PC.
 

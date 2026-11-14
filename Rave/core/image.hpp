@@ -25,6 +25,7 @@ namespace img
     bool decodePng(const void* data, size_t size, Rgba& out);
     bool decodeKtx2(const void* data, size_t size, Rgba& out, unsigned minSide = 0);
     bool encodePng(const Rgba& image, std::string& out);
+    bool encodeKtx2(const Rgba& image, std::string& out);
 
     Rgba resize(const Rgba& src, unsigned w, unsigned h);
     Rgba crop(const Rgba& src, unsigned x, unsigned y, unsigned w, unsigned h);

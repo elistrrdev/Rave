@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 
 namespace
 {
@@ -122,6 +123,51 @@ bool mesh::parseObj(const std::string& text, Mesh& out)
         }
     }
     return !out.empty();
+}
+
+bool mesh::parseRbx(const std::string& data, Mesh& out)
+{
+    out.verts.clear();
+    const char* tag = "version 2.00";
+    if (data.size() < 25 || data.compare(0, 12, tag) != 0)
+        return false;
+    size_t p = data.find('\n');
+    if (p == std::string::npos)
+        return false;
+    ++p;
+    const uint8_t* b = (const uint8_t*)data.data();
+    uint16_t headerSize = (uint16_t)(b[p] | (b[p + 1] << 8));
+    uint8_t vertexSize = b[p + 2];
+    uint8_t faceSize = b[p + 3];
+    uint32_t nv = 0, nf = 0;
+    memcpy(&nv, b + p + 4, 4);
+    memcpy(&nf, b + p + 8, 4);
+    size_t vo = p + headerSize;
+    size_t fo = vo + (size_t)nv * vertexSize;
+    if (vertexSize < 36 || faceSize < 12 || fo + (size_t)nf * faceSize > data.size())
+        return false;
+    out.verts.reserve((size_t)nf * 3);
+    for (uint32_t f = 0; f < nf; ++f)
+    {
+        uint32_t idx[3];
+        memcpy(idx, b + fo + (size_t)f * faceSize, 12);
+        for (uint32_t i : idx)
+        {
+            if (i >= nv)
+                return false;
+            float v[9];
+            memcpy(v, b + vo + (size_t)i * vertexSize, 36);
+            out.verts.push_back({ v[0], v[1], v[2], v[6], 1.f - v[7] });
+        }
+    }
+    return !out.empty();
+}
+
+bool mesh::parse(const std::string& data, Mesh& out)
+{
+    if (data.compare(0, 8, "version ") == 0)
+        return parseRbx(data, out);
+    return parseObj(data, out);
 }
 
 img::Rgba mesh::render(const Mesh& m, const img::Rgba& texture, unsigned w, unsigned h)

@@ -17,5 +17,7 @@ namespace mesh
     };
 
     bool parseObj(const std::string& text, Mesh& out);
+    bool parseRbx(const std::string& data, Mesh& out);
+    bool parse(const std::string& data, Mesh& out);
     img::Rgba render(const Mesh& m, const img::Rgba& texture, unsigned w, unsigned h);
 }

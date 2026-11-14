@@ -291,6 +291,74 @@ bool img::encodePng(const Rgba& image, std::string& out)
     return SUCCEEDED(stream->Read(out.data(), (ULONG)out.size(), &read)) && read == out.size();
 }
 
+bool img::encodeKtx2(const Rgba& image, std::string& out)
+{
+    if (image.empty() || image.w > 8192 || image.h > 8192)
+        return false;
+
+    std::vector<Rgba> levels;
+    levels.push_back(image);
+    while (levels.back().w > 1 || levels.back().h > 1)
+    {
+        const Rgba& last = levels.back();
+        levels.push_back(resize(last, std::max(1u, last.w / 2), std::max(1u, last.h / 2)));
+    }
+    const uint32_t count = (uint32_t)levels.size();
+
+    std::string dfd;
+    auto put32 = [](std::string& s, uint32_t v) { s.append((const char*)&v, 4); };
+    auto put16 = [](std::string& s, uint16_t v) { s.append((const char*)&v, 2); };
+    put32(dfd, 4 + 24 + 16 * 4);
+    put32(dfd, 0);
+    put16(dfd, 2);
+    put16(dfd, 24 + 16 * 4);
+    dfd += (char)1;
+    dfd += (char)1;
+    dfd += (char)1;
+    dfd += (char)0;
+    put32(dfd, 0);
+    dfd += (char)4;
+    dfd.append(7, '\0');
+    const uint8_t channels[4] = { 0, 1, 2, 15 };
+    for (int i = 0; i < 4; ++i)
+    {
+        put16(dfd, (uint16_t)(i * 8));
+        dfd += (char)7;
+        dfd += (char)channels[i];
+        put32(dfd, 0);
+        put32(dfd, 0);
+        put32(dfd, 255);
+    }
+
+    const uint32_t headerSize = 80 + 24 * count;
+    const uint32_t dfdOffset = headerSize;
+    uint64_t cursor = dfdOffset + dfd.size();
+    cursor = (cursor + 3) & ~3ull;
+    std::vector<uint64_t> offsets(count);
+    for (uint32_t i = count; i-- > 0;)
+    {
+        cursor = (cursor + 3) & ~3ull;
+        offsets[i] = cursor;
+        cursor += levels[i].px.size();
+    }
+
+    out.assign((size_t)cursor, '\0');
+    uint8_t* b = (uint8_t*)out.data();
+    memcpy(b, kKtx2Id, 12);
+    const uint32_t fields[9] = { 37, 1, image.w, image.h, 0, 0, 1, count, 0 };
+    memcpy(b + 12, fields, sizeof(fields));
+    const uint32_t index[4] = { dfdOffset, (uint32_t)dfd.size(), 0, 0 };
+    memcpy(b + 48, index, sizeof(index));
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        const uint64_t entry[3] = { offsets[i], levels[i].px.size(), levels[i].px.size() };
+        memcpy(b + 80 + 24 * i, entry, sizeof(entry));
+        memcpy(b + offsets[i], levels[i].px.data(), levels[i].px.size());
+    }
+    memcpy(b + dfdOffset, dfd.data(), dfd.size());
+    return true;
+}
+
 img::Rgba img::resize(const Rgba& src, unsigned w, unsigned h)
 {
     Rgba out;

@@ -16,6 +16,7 @@ namespace skins
         std::string name;
         std::string source;
         Kind kind = Kind::Original;
+        bool model = false;
     };
 
     struct Target
@@ -23,6 +24,9 @@ namespace skins
         std::string id;
         std::string name;
         std::vector<std::string> textures;
+        std::vector<std::string> meshes;
+        std::string meshVerts;
+        bool ktx2 = false;
         int meshRes = 0;
         int textureRes = 0;
     };
