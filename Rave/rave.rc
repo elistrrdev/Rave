@@ -85,6 +85,8 @@
 288 RCDATA "../games/realistic-home-defense/textures/WASR-10.png"
 289 RCDATA "../games/realistic-home-defense/textures/Remington 700.mesh"
 290 RCDATA "../games/realistic-home-defense/textures/Remington 700.png"
+291 RCDATA "../games/realistic-home-defense/textures/KR-103.mesh"
+292 RCDATA "../games/realistic-home-defense/textures/KR-103.png"
 
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION RAVE_VERSION_MAJOR,RAVE_VERSION_MINOR,0,0
