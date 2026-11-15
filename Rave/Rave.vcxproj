@@ -100,6 +100,7 @@
     <ClCompile Include="custom\misc.cpp" />
     <ClCompile Include="custom\tab.cpp" />
     <ClCompile Include="core\accounts.cpp" />
+    <ClCompile Include="core\discord.cpp" />
     <ClCompile Include="core\fflags.cpp" />
     <ClCompile Include="core\image.cpp" />
     <ClCompile Include="core\inflate.cpp" />
@@ -109,8 +110,10 @@
     <ClCompile Include="core\net.cpp" />
     <ClCompile Include="core\paths.cpp" />
     <ClCompile Include="core\rbxcache.cpp" />
+    <ClCompile Include="core\protocol.cpp" />
     <ClCompile Include="core\report.cpp" />
     <ClCompile Include="core\roblox.cpp" />
+    <ClCompile Include="core\servers.cpp" />
     <ClCompile Include="core\settings.cpp" />
     <ClCompile Include="core\skins.cpp" />
     <ClCompile Include="core\sysinfo.cpp" />
@@ -146,6 +149,7 @@
     <ClInclude Include="main.hpp" />
     <ClInclude Include="version.hpp" />
     <ClInclude Include="core\accounts.hpp" />
+    <ClInclude Include="core\discord.hpp" />
     <ClInclude Include="core\fflags.hpp" />
     <ClInclude Include="core\image.hpp" />
     <ClInclude Include="core\mesh.hpp" />
@@ -157,8 +161,10 @@
     <ClInclude Include="core\launcher.hpp" />
     <ClInclude Include="core\net.hpp" />
     <ClInclude Include="core\paths.hpp" />
+    <ClInclude Include="core\protocol.hpp" />
     <ClInclude Include="core\report.hpp" />
     <ClInclude Include="core\roblox.hpp" />
+    <ClInclude Include="core\servers.hpp" />
     <ClInclude Include="core\settings.hpp" />
     <ClInclude Include="core\sysinfo.hpp" />
     <ClInclude Include="core\updater.hpp" />

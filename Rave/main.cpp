@@ -4,6 +4,9 @@
 #include "core/report.hpp"
 #include "core/launcher.hpp"
 #include "core/settings.hpp"
+#include "core/protocol.hpp"
+#include "core/system.hpp"
+#include <shellapi.h>
 #include <wincodec.h>
 #include <wrl/client.h>
 
@@ -23,6 +26,36 @@ void CleanupRenderTarget();
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 static const wchar_t* kWindowClass = L"Rave";
+static const ULONG_PTR kJoinMessage = 0x52415645;
+
+static std::wstring websiteJoinArg()
+{
+    std::wstring found;
+    int argc = 0;
+    LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    if (!argv)
+        return found;
+    for (int i = 1; i < argc && found.empty(); ++i)
+        if (protocol::isLaunch(argv[i]))
+            found = argv[i];
+    for (int i = 0; i < argc; ++i)
+        SecureZeroMemory(argv[i], wcslen(argv[i]) * sizeof(wchar_t));
+    LocalFree(argv);
+    return found;
+}
+
+static bool handToRunningRave(const std::wstring& join)
+{
+    HWND existing = FindWindowW(kWindowClass, nullptr);
+    if (!existing)
+        return false;
+    COPYDATASTRUCT data{};
+    data.dwData = kJoinMessage;
+    data.cbData = (DWORD)(join.size() * sizeof(wchar_t));
+    data.lpData = (void*)join.data();
+    DWORD_PTR result = 0;
+    return SendMessageTimeoutW(existing, WM_COPYDATA, 0, (LPARAM)&data, SMTO_ABORTIFHUNG, 5000, &result) && result == TRUE;
+}
 
 static bool focusExistingInstance()
 {
@@ -42,13 +75,29 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     report::installCrashHandler();
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
+    if (wcsstr(GetCommandLineW(), L" /website-joins-off"))
+    {
+        std::string error;
+        protocol::disable(error);
+        ExitProcess(0);
+    }
+
     if (!net::hasInternet())
         ExitProcess(0);
+
+    std::wstring join = websiteJoinArg();
 
     app::instanceMutex = CreateMutexW(nullptr, TRUE, app::mutexName);
     DWORD mutexError = GetLastError();
     if (!app::instanceMutex || mutexError == ERROR_ALREADY_EXISTS || mutexError == ERROR_ACCESS_DENIED)
     {
+        if (!join.empty())
+        {
+            for (int i = 0; i < 50 && !handToRunningRave(join); ++i)
+                Sleep(100);
+            SecureZeroMemory(join.data(), join.size() * sizeof(wchar_t));
+            ExitProcess(0);
+        }
         for (int i = 0; i < 20 && !focusExistingInstance(); ++i)
             Sleep(100);
         ExitProcess(0);
@@ -79,6 +128,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         ExitProcess(1);
     }
 
+    ChangeWindowMessageFilterEx(window::dx::hwnd, WM_COPYDATA, MSGFLT_ALLOW, nullptr);
     SendMessageW(window::dx::hwnd, WM_SETICON, ICON_BIG, (LPARAM)wc.hIcon);
     SendMessageW(window::dx::hwnd, WM_SETICON, ICON_SMALL, (LPARAM)wc.hIconSm);
 
@@ -100,6 +150,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
 
     ui::BeforeLoop(g_pd3dDevice);
+
+    if (!join.empty())
+    {
+        std::string text = sys::narrow(join);
+        SecureZeroMemory(join.data(), join.size() * sizeof(wchar_t));
+        join.clear();
+        launcher::launchWebsite(std::move(text));
+    }
 
     bool done = false;
     while (!done)
@@ -372,6 +430,19 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
             SetForegroundWindow(hWnd);
         }
         return 0;
+    case WM_COPYDATA:
+    {
+        const COPYDATASTRUCT* data = (const COPYDATASTRUCT*)lParam;
+        if (!data || data->dwData != kJoinMessage || !data->lpData || data->cbData == 0 || data->cbData % sizeof(wchar_t) || data->cbData > 16384)
+            return FALSE;
+        std::wstring text((const wchar_t*)data->lpData, data->cbData / sizeof(wchar_t));
+        if (!protocol::isLaunch(text))
+            return FALSE;
+        std::string join = sys::narrow(text);
+        SecureZeroMemory(text.data(), text.size() * sizeof(wchar_t));
+        launcher::launchWebsite(std::move(join));
+        return TRUE;
+    }
     case WM_SETTINGCHANGE:
         caret::refresh();
         break;

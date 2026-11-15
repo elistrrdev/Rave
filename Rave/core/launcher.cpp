@@ -3,6 +3,7 @@
 #include "fflags.hpp"
 #include "report.hpp"
 #include "roblox.hpp"
+#include "servers.hpp"
 #include "settings.hpp"
 #include "skins.hpp"
 #include "system.hpp"
@@ -117,6 +118,32 @@ namespace
             windowAction(launcher::WindowRestore);
     }
 
+    enum class JobKind { App, Website, Server };
+
+    struct Job
+    {
+        JobKind kind = JobKind::App;
+        std::string website;
+        uint64_t placeId = 0;
+        std::string jobId;
+    };
+
+    uint64_t unixMs()
+    {
+        FILETIME ft;
+        GetSystemTimeAsFileTime(&ft);
+        ULARGE_INTEGER now{};
+        now.LowPart = ft.dwLowDateTime;
+        now.HighPart = ft.dwHighDateTime;
+        return (now.QuadPart - 116444736000000000ull) / 10000ull;
+    }
+
+    std::string trackerId()
+    {
+        std::random_device rd;
+        return std::to_string(100000000000ull + ((((uint64_t)rd() << 32) | rd()) % 900000000000ull));
+    }
+
     std::wstring robloxLocale()
     {
         wchar_t name[LOCALE_NAME_MAX_LENGTH]{};
@@ -136,25 +163,41 @@ namespace
 
     std::wstring signedInArgs(const std::string& ticket)
     {
-        FILETIME ft;
-        GetSystemTimeAsFileTime(&ft);
-        ULARGE_INTEGER now{};
-        now.LowPart = ft.dwLowDateTime;
-        now.HighPart = ft.dwHighDateTime;
-        uint64_t unixMs = (now.QuadPart - 116444736000000000ull) / 10000ull;
-
-        std::random_device rd;
-        uint64_t tracker = 100000000000ull + ((((uint64_t)rd() << 32) | rd()) % 900000000000ull);
-
         std::wstring locale = robloxLocale();
         return L"roblox-player:1+launchmode:app+gameinfo:" + sys::widen(ticket) +
-            L"+launchtime:" + std::to_wstring(unixMs) +
-            L"+browsertrackerid:" + std::to_wstring(tracker) +
+            L"+launchtime:" + std::to_wstring(unixMs()) +
+            L"+browsertrackerid:" + sys::widen(trackerId()) +
             L"+robloxLocale:" + locale + L"+gameLocale:" + locale +
             L"+channel:+LaunchExp:InApp";
     }
 
-    void runLaunch()
+    std::wstring serverArgs(const std::string& ticket, uint64_t placeId, const std::string& jobId)
+    {
+        std::string tracker = trackerId();
+        std::wstring locale = robloxLocale();
+        return L"roblox-player:1+launchmode:play+gameinfo:" + sys::widen(ticket) +
+            L"+launchtime:" + std::to_wstring(unixMs()) +
+            L"+placelauncherurl:" + sys::widen(servers::urlEncode(servers::placeLauncherUrl(placeId, jobId, tracker))) +
+            L"+browsertrackerid:" + sys::widen(tracker) +
+            L"+robloxLocale:" + locale + L"+gameLocale:" + locale +
+            L"+channel:";
+    }
+
+    void wipe(std::string& s)
+    {
+        if (!s.empty())
+            SecureZeroMemory(s.data(), s.size());
+        s.clear();
+    }
+
+    void wipe(std::wstring& s)
+    {
+        if (!s.empty())
+            SecureZeroMemory(s.data(), s.size() * sizeof(wchar_t));
+        s.clear();
+    }
+
+    void runLaunch(Job job)
     {
         CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
@@ -200,7 +243,45 @@ namespace
 
         std::wstring args = L"--app";
         uint64_t accountId = accounts::selected();
-        if (accountId)
+        if (job.kind == JobKind::Website)
+        {
+            if (settings::get().bestServer)
+            {
+                log("Looking for the best server", launcher::LogLevel::Info);
+                std::string summary;
+                if (servers::improveWebsiteJoin(job.website, summary))
+                    log("Best server: " + summary, launcher::LogLevel::Success);
+                else if (!summary.empty())
+                    log(summary + ", Roblox picks the server", launcher::LogLevel::Warn);
+            }
+            args = sys::widen(job.website);
+            wipe(job.website);
+            log("Joining from the website (with the account signed in there)", launcher::LogLevel::Info);
+        }
+        else if (job.kind == JobKind::Server)
+        {
+            if (accountId)
+            {
+                accounts::Account who;
+                std::string ticket;
+                if (!accounts::ticket(accountId, ticket, who, error))
+                {
+                    log("Sign-in failed: " + error, launcher::LogLevel::Error);
+                    currentTask = launcher::Task::Idle;
+                    CoUninitialize();
+                    return;
+                }
+                args = serverArgs(ticket, job.placeId, job.jobId);
+                wipe(ticket);
+                log("Joining the server as " + accounts::label(who), launcher::LogLevel::Info);
+            }
+            else
+            {
+                args = L"roblox://experiences/start?placeId=" + std::to_wstring(job.placeId) + L"&gameInstanceId=" + sys::widen(job.jobId);
+                log("Joining the server", launcher::LogLevel::Info);
+            }
+        }
+        else if (accountId)
         {
             accounts::Account who;
             std::string ticket;
@@ -219,7 +300,9 @@ namespace
             log("Launching Roblox", launcher::LogLevel::Info);
         }
 
-        if (!roblox::launch(latest.guid, args, error))
+        bool launched = roblox::launch(latest.guid, args, error);
+        wipe(args);
+        if (!launched)
         {
             failWithReport("Roblox launch failed", error);
             currentTask = launcher::Task::Idle;
@@ -282,7 +365,37 @@ void launcher::launch()
         log("Rave is busy, please wait", LogLevel::Info);
         return;
     }
-    std::thread(runLaunch).detach();
+    std::thread(runLaunch, Job{}).detach();
+}
+
+void launcher::launchWebsite(std::string launchString)
+{
+    Task expected = Task::Idle;
+    if (!currentTask.compare_exchange_strong(expected, Task::Checking))
+    {
+        wipe(launchString);
+        log("Rave is busy, click Play again in a moment", LogLevel::Info);
+        return;
+    }
+    Job job;
+    job.kind = JobKind::Website;
+    job.website = std::move(launchString);
+    std::thread(runLaunch, std::move(job)).detach();
+}
+
+void launcher::joinServer(uint64_t placeId, const std::string& jobId)
+{
+    Task expected = Task::Idle;
+    if (!currentTask.compare_exchange_strong(expected, Task::Checking))
+    {
+        log("Rave is busy, please wait", LogLevel::Info);
+        return;
+    }
+    Job job;
+    job.kind = JobKind::Server;
+    job.placeId = placeId;
+    job.jobId = jobId;
+    std::thread(runLaunch, std::move(job)).detach();
 }
 
 launcher::Task launcher::task()

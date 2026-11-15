@@ -1623,6 +1623,35 @@ namespace
         return installed ? 0 : 1;
     }
 
+    bool joinsPointTo(const std::wstring& exe)
+    {
+        std::wstring cmd = regRead(HKEY_CURRENT_USER, L"Software\\Classes\\roblox-player\\shell\\open\\command", nullptr, 0);
+        std::wstring a = cmd, b = exe;
+        CharLowerBuffW(a.data(), (DWORD)a.size());
+        CharLowerBuffW(b.data(), (DWORD)b.size());
+        return !b.empty() && a.find(b) != std::wstring::npos;
+    }
+
+    void giveBackWebsiteJoins(const std::wstring& exe)
+    {
+        if (!joinsPointTo(exe))
+            return;
+
+        std::wstring cmd = L"\"" + exe + L"\" /website-joins-off";
+        STARTUPINFOW si{};
+        si.cb = sizeof(si);
+        PROCESS_INFORMATION pi{};
+        if (CreateProcessW(exe.c_str(), cmd.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi))
+        {
+            WaitForSingleObject(pi.hProcess, 10000);
+            CloseHandle(pi.hThread);
+            CloseHandle(pi.hProcess);
+        }
+
+        if (joinsPointTo(exe))
+            RegDeleteTreeW(HKEY_CURRENT_USER, L"Software\\Classes\\roblox-player");
+    }
+
     int runUninstaller(const std::wstring& dir)
     {
         std::wstring exe = dir + L"\\Rave.exe";
@@ -1632,6 +1661,7 @@ namespace
         if (!closeRave(nullptr))
             return 1;
 
+        giveBackWebsiteJoins(exe);
         deleteFileRetry(exe);
         deleteFileRetry(dir + L"\\uninstall.exe");
         deleteFileRetry(dir + L"\\LICENSE.txt");

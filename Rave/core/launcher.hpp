@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <functional>
 #include <string>
 
@@ -22,6 +23,8 @@ namespace launcher
     void setWindow(void* hwnd);
     void startMonitor();
     void launch();
+    void launchWebsite(std::string launchString);
+    void joinServer(uint64_t placeId, const std::string& jobId);
 
     Task task();
     float progress();

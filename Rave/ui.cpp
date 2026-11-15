@@ -1,12 +1,16 @@
 #include "colors.hpp"
 #include "core/accounts.hpp"
+#include "core/discord.hpp"
 #include "core/fflags.hpp"
 #include "core/launcher.hpp"
+#include "core/protocol.hpp"
+#include "core/servers.hpp"
 #include "core/settings.hpp"
 #include "core/skins.hpp"
 #include "core/sysinfo.hpp"
 #include "core/system.hpp"
 #include "core/updater.hpp"
+#include <mutex>
 #include <thread>
 
 static std::string windowsName;
@@ -83,17 +87,33 @@ namespace prefs
 {
 	static bool openRequest = false;
 	static settings::Values draft, original;
+	static int page = 0;
 	static const char* kPopup = "SETTINGS";
 
 	static void open()
 	{
 		draft = original = settings::get();
+		page = 0;
 		openRequest = true;
 	}
 
 	static void saveAndClose()
 	{
-		bool changed = draft.behavior != original.behavior || draft.accent != original.accent;
+		if (draft.websiteJoins != original.websiteJoins)
+		{
+			std::string error;
+			bool ok = draft.websiteJoins ? protocol::enable(error) : protocol::disable(error);
+			if (ok)
+				items::sendLog(draft.websiteJoins ? "Play on roblox.com now starts Roblox through Rave" : "Website joins given back to the Roblox launcher", logType::success);
+			else
+			{
+				items::sendLog("Website joins: " + error, logType::error);
+				draft.websiteJoins = original.websiteJoins;
+			}
+		}
+
+		bool changed = draft.behavior != original.behavior || draft.accent != original.accent ||
+			draft.websiteJoins != original.websiteJoins || draft.discordStatus != original.discordStatus || draft.bestServer != original.bestServer;
 		if (changed)
 		{
 			settings::set(draft);
@@ -203,6 +223,13 @@ void ui::BeforeLoop(ID3D11Device* dvc) {
 		items::sendLog(text, type);
 	});
 	launcher::startMonitor();
+	if (settings::get().websiteJoins && !protocol::registered())
+	{
+		std::string error;
+		if (protocol::enable(error))
+			items::sendLog("Rave took the website joins back from the Roblox launcher", logType::info);
+	}
+	discord::start();
 	updater::start(window::dx::hwnd);
 }
 
@@ -422,6 +449,52 @@ namespace skinui
 	}
 }
 
+namespace finder
+{
+	static bool openRequest = false;
+	static char link[512];
+	static const char* kPopup = "BEST SERVER";
+
+	static std::mutex lock;
+	static bool busy = false;
+	static uint64_t place = 0;
+	static servers::Result result;
+	static unsigned generation = 0;
+
+	static void open()
+	{
+		openRequest = true;
+	}
+
+	static void close()
+	{
+		ClearActiveID();
+		CloseCurrentPopup();
+	}
+
+	static void search(uint64_t placeId)
+	{
+		unsigned gen;
+		{
+			std::lock_guard<std::mutex> guard(lock);
+			busy = true;
+			place = placeId;
+			result = {};
+			gen = ++generation;
+		}
+		std::thread([placeId, gen] {
+			CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+			servers::Result found = servers::find(placeId);
+			CoUninitialize();
+			std::lock_guard<std::mutex> guard(lock);
+			if (gen != generation)
+				return;
+			result = std::move(found);
+			busy = false;
+		}).detach();
+	}
+}
+
 static void homePage(ImGuiWindow* window)
 {
 	SetCursorPos({ 20, 100 });
@@ -441,12 +514,17 @@ static void homePage(ImGuiWindow* window)
 			}
 			EndChild();
 
-			SetCursorPosX(20);
-			if (items::button(launchLabel() + "###LAUNCH", { c->Size.x - GetCursorPosX() * 2 , 45 }))
-				launcher::launch();
-
 			const float row = c->Size.x - 40;
 			const float third = std::floor((row - 24) / 3);
+
+			SetCursorPosX(20);
+			if (items::button(launchLabel() + "###LAUNCH", { row - third - 12, 45 }))
+				launcher::launch();
+
+			SameLine();
+			if (items::button("BEST SERVER", { third, 45 }))
+				finder::open();
+
 			SetCursorPosX(20);
 			if (items::button("FFLAGS EDITOR", { third, 45 }))
 				editor::open();
@@ -1033,38 +1111,80 @@ static void settingsWindow(ImGuiWindow* window)
 
 	PushFont(f.montM[0]);
 
-	draw::text("BEHAVIOR ON START", { 20, 72 }, colors::Lwhite);
-
-	struct Option { const char* label; settings::StartBehavior value; };
-	const Option options[] = {
-		{ "KEEP OPEN", settings::StartBehavior::KeepOpen },
-		{ "MINIMIZE", settings::StartBehavior::Minimize },
-		{ "HIDE", settings::StartBehavior::Hide },
-	};
-	const float gap = 10;
-	const _V2 choiceSize = { std::floor((inner - gap * 2) / 3), 38 };
-	for (int i = 0; i < 3; ++i)
 	{
-		SetCursorPos({ 20 + (choiceSize.x + gap) * i, 96 });
-		if (items::choice(options[i].label, prefs::draft.behavior == options[i].value, choiceSize))
-			prefs::draft.behavior = options[i].value;
+		const char* pages[] = { "GENERAL", "ROBLOX" };
+		float x = popup->Size.x - 20;
+		for (int i = 1; i >= 0; --i)
+		{
+			const float wBtn = 110;
+			x -= wBtn;
+			SetCursorPos({ x, 16 });
+			if (items::choice(std::string(pages[i]) + "##settingspage", prefs::page == i, { wBtn, 32 }))
+				prefs::page = i;
+			x -= 10;
+		}
 	}
 
-	draw::text("What Rave does when Roblox starts.", { 20, 144 }, colors::Gray);
-	draw::text("HIDE brings Rave back when Roblox closes.", { 20, 164 }, colors::Gray);
-
-	draw::text("ACCENT COLOR", { 20, 204 }, colors::Lwhite);
-
-	int count = 0;
-	const settings::Accent* accents = settings::accents(count);
-	const _V2 swatchSize = { std::floor((inner - gap * (count - 1)) / count), 40 };
-	for (int i = 0; i < count; ++i)
+	if (prefs::page == 0)
 	{
-		SetCursorPos({ 20 + (swatchSize.x + gap) * i, 230 });
-		if (items::swatch(std::string("##accent_") + accents[i].name, accents[i].rgb, prefs::draft.accent == accents[i].rgb, swatchSize))
+		draw::text("BEHAVIOR ON START", { 20, 72 }, colors::Lwhite);
+
+		struct Option { const char* label; settings::StartBehavior value; };
+		const Option options[] = {
+			{ "KEEP OPEN", settings::StartBehavior::KeepOpen },
+			{ "MINIMIZE", settings::StartBehavior::Minimize },
+			{ "HIDE", settings::StartBehavior::Hide },
+		};
+		const float gap = 10;
+		const _V2 choiceSize = { std::floor((inner - gap * 2) / 3), 38 };
+		for (int i = 0; i < 3; ++i)
 		{
-			prefs::draft.accent = accents[i].rgb;
-			applyAccent(accents[i].rgb);
+			SetCursorPos({ 20 + (choiceSize.x + gap) * i, 96 });
+			if (items::choice(options[i].label, prefs::draft.behavior == options[i].value, choiceSize))
+				prefs::draft.behavior = options[i].value;
+		}
+
+		draw::text("What Rave does when Roblox starts.", { 20, 144 }, colors::Gray);
+		draw::text("HIDE brings Rave back when Roblox closes.", { 20, 164 }, colors::Gray);
+
+		draw::text("ACCENT COLOR", { 20, 204 }, colors::Lwhite);
+
+		int count = 0;
+		const settings::Accent* accents = settings::accents(count);
+		const _V2 swatchSize = { std::floor((inner - gap * (count - 1)) / count), 40 };
+		for (int i = 0; i < count; ++i)
+		{
+			SetCursorPos({ 20 + (swatchSize.x + gap) * i, 230 });
+			if (items::swatch(std::string("##accent_") + accents[i].name, accents[i].rgb, prefs::draft.accent == accents[i].rgb, swatchSize))
+			{
+				prefs::draft.accent = accents[i].rgb;
+				applyAccent(accents[i].rgb);
+			}
+		}
+	}
+	else
+	{
+		struct Switch { const char* label; const char* note; bool* value; };
+		const Switch switches[] = {
+			{ "WEBSITE JOINS", "Play on roblox.com starts Roblox through Rave. These joins use the account signed in on the website, not the one chosen in Rave.", &prefs::draft.websiteJoins },
+			{ "BEST SERVER", "Website joins go to the open server closest to you. Not used for friends or private servers.", &prefs::draft.bestServer },
+			{ "DISCORD STATUS", "Shows the game you play in your Discord status while Discord is open on this PC.", &prefs::draft.discordStatus },
+		};
+		const _V2 toggle = { 58, 32 };
+		const float noteW = inner - toggle.x * 2 - 6 - 20;
+		const float bx = popup->Size.x - 20 - toggle.x * 2 - 6;
+		float y = 70;
+		for (int i = 0; i < 3; ++i)
+		{
+			draw::text(switches[i].label, { 20, y }, colors::Lwhite);
+			wrapText(popup, { 20, y + 22 }, colors::Gray, switches[i].note, noteW);
+			SetCursorPos({ bx, y + 6 });
+			if (items::choice(std::string("ON##switch") + std::to_string(i), *switches[i].value, toggle))
+				*switches[i].value = true;
+			SetCursorPos({ bx + toggle.x + 6, y + 6 });
+			if (items::choice(std::string("OFF##switch") + std::to_string(i), !*switches[i].value, toggle))
+				*switches[i].value = false;
+			y += 74;
 		}
 	}
 
@@ -1307,6 +1427,138 @@ static void skinsWindow(ImGuiWindow* window)
 	PopStyleVar();
 }
 
+static void bestServerWindow(ImGuiWindow* window)
+{
+	if (finder::openRequest)
+	{
+		OpenPopup(finder::kPopup);
+		finder::openRequest = false;
+	}
+
+	const _V2 size = { 560, 410 };
+	SetNextWindowPos(window->Pos + (window->Size - size) / 2, ImGuiCond_Always);
+	SetNextWindowSize(size, ImGuiCond_Always);
+
+	PushStyleVar(ImGuiStyleVar_WindowPadding, { 0, 0 });
+	if (!BeginPopupModal(finder::kPopup, nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoSavedSettings))
+	{
+		PopStyleVar();
+		return;
+	}
+
+	if (IsKeyPressed(ImGuiKey_Escape, false))
+	{
+		finder::close();
+		EndPopup();
+		PopStyleVar();
+		return;
+	}
+
+	ImGuiWindow* popup = GetCurrentWindow();
+	const float inner = popup->Size.x - 40;
+
+	SetCursorPos({ 20, 20 });
+	misc::renderMulticolorText({ "BEST ", "SERVER" }, { f.montS[1], f.montS[1] }, { colors::Main, colors::Lwhite });
+
+	PushFont(f.montM[0]);
+
+	wrapText(popup, { 20, 64 }, colors::Lwhite, "Paste a Roblox game link or a place id. Rave looks for the open server closest to you.", inner);
+
+	bool busy;
+	uint64_t place;
+	servers::Result result;
+	{
+		std::lock_guard<std::mutex> guard(finder::lock);
+		busy = finder::busy;
+		place = finder::place;
+		result = finder::result;
+	}
+
+	const float gap = 10;
+	const _V2 findSize = { 120, 38 };
+	const _V2 boxPos = { 20, 108 };
+	const _V2 boxSize = { inner - findSize.x - gap, 38 };
+	PushStyleVar(ImGuiStyleVar_FramePadding, { 12, 10 });
+	PushStyleVar(ImGuiStyleVar_FrameRounding, 6.f);
+	const _V4 boxColor = RGBA(255, 255, 255, 12);
+	PushStyleColor(ImGuiCol_FrameBg, boxColor);
+	PushStyleColor(ImGuiCol_FrameBgHovered, boxColor);
+	PushStyleColor(ImGuiCol_FrameBgActive, boxColor);
+	PushStyleColor(ImGuiCol_Text, colors::Lwhite);
+	SetCursorPos(boxPos);
+	SetNextItemWidth(boxSize.x);
+	bool entered = InputText("##gamelink", finder::link, sizeof(finder::link), ImGuiInputTextFlags_EnterReturnsTrue);
+	bool active = IsItemActive();
+	PopStyleColor(4);
+	PopStyleVar(2);
+	if (finder::link[0] == 0 && !active)
+		popup->DrawList->AddText(popup->Pos + boxPos + _V2(12, 10), _CO(colors::Info), "https://www.roblox.com/games/...");
+
+	SetCursorPos({ 20 + boxSize.x + gap, boxPos.y });
+	if ((items::button(busy ? "SEARCHING...###FIND" : "FIND###FIND", findSize) || entered) && !busy)
+	{
+		uint64_t id = 0;
+		if (servers::placeFromText(finder::link, id))
+			finder::search(id);
+		else
+		{
+			std::lock_guard<std::mutex> guard(finder::lock);
+			finder::result = {};
+			finder::result.error = "That is not a Roblox game link or place id";
+			finder::place = 0;
+		}
+	}
+
+	std::string message;
+	_V4 messageColor = colors::Gray;
+	if (busy)
+		message = "Looking at the open servers and where they are...";
+	else if (!result.error.empty())
+	{
+		message = result.error;
+		messageColor = colors::Red;
+	}
+	else if (result.ok)
+		message = "Closest open servers to " + result.where + " (the ping is an estimate):";
+	else
+		message = "Your location comes from your IP, the server locations from the RoValra API.";
+	wrapText(popup, { 20, 160 }, messageColor, message, inner);
+
+	if (result.ok && !busy)
+	{
+		float y = 188;
+		const _V2 joinSize = { 90, 28 };
+		for (size_t i = 0; i < result.list.size(); ++i)
+		{
+			const servers::Server& srv = result.list[i];
+			_V2 rowPos = popup->Pos + _V2(20, y);
+			popup->DrawList->AddRectFilled(rowPos, rowPos + _V2(inner, 30), _CO(_V4(RGBA(255, 255, 255, i == 0 ? 18 : 9))), 6.f);
+			if (i == 0)
+				popup->DrawList->AddRect(rowPos, rowPos + _V2(inner, 30), _CO(colors::Main), 6.f, 0, 1.f);
+			std::string where = srv.city.empty() ? srv.country : srv.city + ", " + srv.country;
+			draw::text(skinui::ellipsize(where, 200), { 32, y + 6 }, colors::Lwhite);
+			draw::text("about " + std::to_string(srv.ping) + " ms", { 250, y + 6 }, i == 0 ? colors::Main : colors::Gray);
+			draw::text(std::to_string(srv.playing) + "/" + std::to_string(srv.maxPlayers) + " players", { 350, y + 6 }, colors::Gray);
+			SetCursorPos({ 20 + inner - joinSize.x - 1, y + 1 });
+			if (items::choice("JOIN##server" + std::to_string(i), i == 0, joinSize) && launcher::task() == launcher::Task::Idle)
+			{
+				launcher::joinServer(place, srv.id);
+				finder::close();
+			}
+			y += 32;
+		}
+	}
+
+	SetCursorPos({ 20, popup->Size.y - 20 - 40 });
+	if (items::button("CLOSE", { inner, 40 }))
+		finder::close();
+
+	PopFont();
+
+	EndPopup();
+	PopStyleVar();
+}
+
 void ui::Render() {
 	static Tab tab = Tab::Home;
 	const Tab shownTab = tab;
@@ -1358,6 +1610,7 @@ void ui::Render() {
 		settingsWindow(window);
 		addAccountWindow(window);
 		skinsWindow(window);
+		bestServerWindow(window);
 	}
 	ImGui::End();
 }

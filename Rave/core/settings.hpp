@@ -10,6 +10,9 @@ namespace settings
     {
         StartBehavior behavior = StartBehavior::KeepOpen;
         uint32_t accent = 0x6addbb;
+        bool websiteJoins = false;
+        bool discordStatus = true;
+        bool bestServer = false;
     };
 
     struct Accent

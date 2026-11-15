@@ -90,6 +90,12 @@ void settings::load()
             uint32_t accent;
             if (parseHex(v["accent"].str(), accent))
                 values.accent = accent;
+            if (v["websiteJoins"].type == json::Value::Type::Bool)
+                values.websiteJoins = v["websiteJoins"].boolean;
+            if (v["discordStatus"].type == json::Value::Type::Bool)
+                values.discordStatus = v["discordStatus"].boolean;
+            if (v["bestServer"].type == json::Value::Type::Bool)
+                values.bestServer = v["bestServer"].boolean;
         }
     }
 
@@ -100,8 +106,11 @@ void settings::load()
 bool settings::save()
 {
     Values values = get();
-    char buf[256];
-    snprintf(buf, sizeof(buf), "{\r\n    \"startBehavior\": \"%s\",\r\n    \"accent\": \"#%06x\"\r\n}\r\n", behaviorName(values.behavior), values.accent & 0xFFFFFF);
+    char buf[512];
+    snprintf(buf, sizeof(buf),
+        "{\r\n    \"startBehavior\": \"%s\",\r\n    \"accent\": \"#%06x\",\r\n    \"websiteJoins\": %s,\r\n    \"discordStatus\": %s,\r\n    \"bestServer\": %s\r\n}\r\n",
+        behaviorName(values.behavior), values.accent & 0xFFFFFF,
+        values.websiteJoins ? "true" : "false", values.discordStatus ? "true" : "false", values.bestServer ? "true" : "false");
 
     HANDLE h = CreateFileW(filePath().c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (h == INVALID_HANDLE_VALUE)
