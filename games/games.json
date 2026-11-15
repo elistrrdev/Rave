@@ -73,6 +73,7 @@
           "textures": [
             "82603222461633"
           ],
+          "mesh": 223,
           "texture": 217,
           "texturePrints": [
             "1010:1863829474",
@@ -92,11 +93,19 @@
           "textures": [
             "74453061964221"
           ],
+          "mesh": 224,
           "texture": 218,
           "texturePrints": [
             "1182:596206425",
             "855:1133405943"
-          ]
+          ],
+          "meshes": [
+            "118007003118471"
+          ],
+          "meshPrints": [
+            "43402:1659125813"
+          ],
+          "meshVerts": "7189e03f3476bd3e9b4d9ebdc7e9e03fb41ed13efc30cc347b47db3f080eadbd5113a134c7e9e03fb41ed13e0a2809bd"
         },
         {
           "id": "revolver",
@@ -104,6 +113,7 @@
           "textures": [
             "106990054205648"
           ],
+          "mesh": 225,
           "texture": 219,
           "texturePrints": [
             "1140:2663509872",
@@ -123,11 +133,19 @@
           "textures": [
             "82337709"
           ],
+          "mesh": 226,
           "texture": 220,
           "texturePrints": [
             "13795:202012879",
             "2633:1799129979"
-          ]
+          ],
+          "meshes": [
+            "82337638"
+          ],
+          "meshPrints": [
+            "23273:3476175714"
+          ],
+          "meshVerts": "b551353e5dbfc0bdf967d6bde887313e5d509fbda9467eb9e887313e498002becd8f22bbb551353edbe014beff5edabd"
         },
         {
           "id": "c4",
@@ -135,10 +153,18 @@
           "textures": [
             "87643737848206"
           ],
+          "mesh": 227,
           "texture": 222,
           "texturePrints": [
             "920:749053858"
-          ]
+          ],
+          "meshes": [
+            "124812262169382"
+          ],
+          "meshPrints": [
+            "2349:2792264875"
+          ],
+          "meshVerts": "79cd03c1085d7a40d935824100ded3be1c5d7ac0d935824100ded3be085d7a40d935824179cd03c11c5d7ac0d9358241"
         }
       ],
       "skins": [
@@ -168,7 +194,7 @@
           "name": "Oni Bucky",
           "res": 260,
           "meshRes": 259,
-          "source": "VALORANT skin by Riot Games"
+          "source": "Community VALORANT replica"
         },
         {
           "target": "ak47",
@@ -210,28 +236,28 @@
           "name": "Forsaken Vandal White",
           "res": 248,
           "meshRes": 247,
-          "source": "VALORANT skin by Riot Games"
+          "source": "Community VALORANT replica"
         },
         {
           "target": "ak47",
           "name": "Gaia Vandal Red",
           "res": 250,
           "meshRes": 249,
-          "source": "VALORANT skin by Riot Games"
+          "source": "Community VALORANT replica"
         },
         {
           "target": "ak47",
           "name": "Prelude Vandal Purple",
           "res": 252,
           "meshRes": 251,
-          "source": "VALORANT skin by Riot Games"
+          "source": "Community VALORANT replica"
         },
         {
           "target": "ak47",
           "name": "Reaver Vandal Purple",
           "res": 254,
           "meshRes": 253,
-          "source": "VALORANT skin by Riot Games"
+          "source": "Community VALORANT replica"
         },
         {
           "target": "revolver",
@@ -259,14 +285,14 @@
           "name": "Arcane Sheriff",
           "res": 256,
           "meshRes": 255,
-          "source": "VALORANT skin by Riot Games"
+          "source": "Community VALORANT replica"
         },
         {
           "target": "revolver",
           "name": "Rogue Bandit",
           "res": 258,
           "meshRes": 257,
-          "source": "VALORANT skin by Riot Games"
+          "source": "Community VALORANT replica"
         }
       ]
     },

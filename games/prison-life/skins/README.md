@@ -12,7 +12,7 @@ A skin folder holds:
 The current skins:
 
 - by iitkenny: Dark Purple (M4A1, `m4a1/dark-purple`), Desert Eagle (M9, `m9/desert-eagle`), Silver (Remington 870, `remington/silver`), Silver (AK-47, `ak47/silver`), Oni Vandal Red/White/Black/Green (AK-47, `ak47/oni-vandal`), Black/Gold/Silver (Revolver, `revolver/black-gold-silver`).
-- VALORANT skins (Riot Games): Forsaken Vandal White, Gaia Vandal Red, Prelude Vandal Purple, Reaver Vandal Purple (AK-47), Arcane Sheriff, Rogue Bandit (Revolver), Oni Bucky (Remington 870).
+- VALORANT skins (community made replicas, the designs belong to Riot Games): Forsaken Vandal White, Gaia Vandal Red, Prelude Vandal Purple, Reaver Vandal Purple (AK-47), Arcane Sheriff, Rogue Bandit (Revolver), Oni Bucky (Remington 870).
 
 `skins/source/` still holds `awp kenny.obj` and `m4 vaporwave kenny.obj`, which came without textures and are not bundled.
 
