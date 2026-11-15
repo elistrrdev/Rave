@@ -15,7 +15,7 @@
 
 namespace
 {
-    const char* kAppId = "";
+    const char* kAppId = "1479505409331953827";
 
     struct GameInfo
     {
