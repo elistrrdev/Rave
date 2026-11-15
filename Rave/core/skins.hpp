@@ -19,6 +19,13 @@ namespace skins
         bool model = false;
     };
 
+    struct HiddenPart
+    {
+        std::string id;
+        std::string verts;
+        float size[3] = { 1.f, 1.f, 1.f };
+    };
+
     struct Target
     {
         std::string id;
@@ -29,6 +36,10 @@ namespace skins
         bool ktx2 = false;
         int meshRes = 0;
         int textureRes = 0;
+        bool paint = false;
+        int baseMeshRes = 0;
+        int baseTextureRes = 0;
+        std::vector<HiddenPart> hidden;
     };
 
     struct Game

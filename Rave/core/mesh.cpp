@@ -303,3 +303,108 @@ img::Rgba mesh::render(const Mesh& m, const img::Rgba& texture, unsigned w, unsi
 
     return img::resize(big, w, h);
 }
+
+namespace
+{
+    void put32(std::string& out, uint32_t v)
+    {
+        out.append((const char*)&v, 4);
+    }
+
+    void header(std::string& out, uint8_t vertexSize, uint32_t nv, uint32_t nf)
+    {
+        out = "version 2.00\n";
+        uint16_t size = 12;
+        out.append((const char*)&size, 2);
+        out += (char)vertexSize;
+        out += (char)12;
+        put32(out, nv);
+        put32(out, nf);
+    }
+
+    void sample(const img::Rgba& t, float u, float v, uint8_t out[3])
+    {
+        float fx = (u - std::floor(u)) * t.w - 0.5f;
+        float fy = (v - std::floor(v)) * t.h - 0.5f;
+        int x0 = (int)std::floor(fx), y0 = (int)std::floor(fy);
+        float ax = fx - x0, ay = fy - y0;
+        auto at = [&](int x, int y, int k) {
+            x = ((x % (int)t.w) + (int)t.w) % (int)t.w;
+            y = ((y % (int)t.h) + (int)t.h) % (int)t.h;
+            return (float)t.px[((size_t)y * t.w + x) * 4 + k];
+        };
+        for (int k = 0; k < 3; ++k)
+        {
+            float top = at(x0, y0, k) * (1 - ax) + at(x0 + 1, y0, k) * ax;
+            float bottom = at(x0, y0 + 1, k) * (1 - ax) + at(x0 + 1, y0 + 1, k) * ax;
+            out[k] = (uint8_t)std::clamp(top * (1 - ay) + bottom * ay + 0.5f, 0.f, 255.f);
+        }
+    }
+}
+
+bool mesh::paint(const std::string& data, const img::Rgba& texture, std::string& out)
+{
+    out.clear();
+    if (texture.empty() || data.size() < 25 || data.compare(0, 12, "version 2.00") != 0)
+        return false;
+    size_t p = data.find('\n');
+    if (p == std::string::npos)
+        return false;
+    ++p;
+    const uint8_t* b = (const uint8_t*)data.data();
+    uint16_t headerSize = (uint16_t)(b[p] | (b[p + 1] << 8));
+    uint8_t vertexSize = b[p + 2];
+    uint8_t faceSize = b[p + 3];
+    uint32_t nv = 0, nf = 0;
+    memcpy(&nv, b + p + 4, 4);
+    memcpy(&nf, b + p + 8, 4);
+    size_t vo = p + headerSize;
+    size_t fo = vo + (size_t)nv * vertexSize;
+    if (vertexSize < 36 || faceSize < 12 || fo + (size_t)nf * faceSize > data.size())
+        return false;
+
+    const unsigned side = 256;
+    img::Rgba small = texture.w > side || texture.h > side ? img::resize(texture, std::min(side, texture.w), std::min(side, texture.h)) : texture;
+    header(out, 40, nv, nf);
+    out.reserve(out.size() + (size_t)nv * 40 + (size_t)nf * 12);
+    for (uint32_t i = 0; i < nv; ++i)
+    {
+        float v[9];
+        memcpy(v, b + vo + (size_t)i * vertexSize, 36);
+        out.append((const char*)v, 36);
+        uint8_t c[4] = { 0, 0, 0, 255 };
+        sample(small, v[6], v[7], c);
+        out.append((const char*)c, 4);
+    }
+    for (uint32_t f = 0; f < nf; ++f)
+    {
+        uint32_t idx[3];
+        memcpy(idx, b + fo + (size_t)f * faceSize, 12);
+        for (uint32_t k : idx)
+            if (k >= nv)
+                return false;
+        out.append((const char*)idx, 12);
+    }
+    return true;
+}
+
+std::string mesh::hidden(const float size[3])
+{
+    const float t = 0.001f;
+    const float pts[12][3] = {
+        { -size[0], 0, 0 }, { size[0], 0, 0 }, { 0, 0, 0 },
+        { 0, -size[1], 0 }, { 0, size[1], 0 }, { 0, 0, 0 },
+        { 0, 0, -size[2] }, { 0, 0, size[2] }, { 0, 0, 0 },
+        { 0, 0, 0 }, { t, 0, 0 }, { 0, t, 0 },
+    };
+    std::string out;
+    header(out, 36, 12, 4);
+    for (const auto& q : pts)
+    {
+        const float v[9] = { q[0], q[1], q[2], 0.f, 0.f, 1.f, 0.f, 0.f, 0.f };
+        out.append((const char*)v, 36);
+    }
+    for (uint32_t i = 0; i < 12; ++i)
+        put32(out, i);
+    return out;
+}

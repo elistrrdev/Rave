@@ -88,6 +88,61 @@
           "meshVerts": "73cbea3ea5258b400000c8c1399e6b3f7b8bfcbe0000c8c13ac5093fcc659cbf0000c8c1399e6b3f57a975400000c8c1"
         },
         {
+          "id": "m700",
+          "name": "M700",
+          "textures": [],
+          "paint": true,
+          "mesh": 228,
+          "texture": 229,
+          "baseMesh": 267,
+          "baseTexture": 268,
+          "meshes": [
+            "863984521"
+          ],
+          "meshPrints": [
+            "5430:4048885664"
+          ],
+          "meshVerts": "43fcbf3f08002d40c078424052fcbf3fe01179409c0d0b4208958a3fd8b75e409c0d0b42f8948a3f006cf23fc0784240",
+          "hidden": [
+            {
+              "id": "m700-barrel",
+              "prints": [
+                "9575:3532971489"
+              ],
+              "size": [
+                2.36,
+                2.0,
+                27.18
+              ],
+              "verts": "dd340dc0b037b3bf7119cdc1b27ec0bf2089cabfc32eccc15046fbbfd08892bfc32eccc11ea2dfbf1038ebbf7119cdc1"
+            },
+            {
+              "id": "m700-scope",
+              "prints": [
+                "19544:3434779295"
+              ],
+              "size": [
+                2.23,
+                7.98,
+                15.93
+              ],
+              "verts": "f2e3423f2c2d86c07c990dc1f2e3423f302d86c082d8d1c0f2e3423ff497afc02b7af6c0f2e3423fccd8b2c00d9de1c0"
+            },
+            {
+              "id": "m700-lenses",
+              "prints": [
+                "726:3481469098"
+              ],
+              "size": [
+                2.06,
+                2.06,
+                14.91
+              ],
+              "verts": "34e9833f007ae4bfe4856e414075e63338e90340e8856e4170f05ab438e903c0e8856e41057ae43f30e9833fe8856e41"
+            }
+          ]
+        },
+        {
           "id": "mp5",
           "name": "MP5",
           "textures": [
@@ -176,6 +231,20 @@
           "source": "Prison Life community, made by iitkenny"
         },
         {
+          "target": "m4a1",
+          "name": "CS2 M4A4",
+          "res": 264,
+          "meshRes": 263,
+          "source": "Counter-Strike 2 model by Valve"
+        },
+        {
+          "target": "m4a1",
+          "name": "CS2 M4A1-S",
+          "res": 266,
+          "meshRes": 265,
+          "source": "Counter-Strike 2 model by Valve"
+        },
+        {
           "target": "m9",
           "name": "Desert Eagle",
           "res": 233,
@@ -260,6 +329,13 @@
           "source": "Community VALORANT replica"
         },
         {
+          "target": "ak47",
+          "name": "CS2 AK-47",
+          "res": 262,
+          "meshRes": 261,
+          "source": "Counter-Strike 2 model by Valve"
+        },
+        {
           "target": "revolver",
           "name": "Black",
           "res": 244,
@@ -293,6 +369,34 @@
           "res": 258,
           "meshRes": 257,
           "source": "Community VALORANT replica"
+        },
+        {
+          "target": "m700",
+          "name": "CS2 AWP",
+          "res": 268,
+          "meshRes": 267,
+          "source": "Counter-Strike 2 model by Valve"
+        },
+        {
+          "target": "m700",
+          "name": "Purple Neon AWP",
+          "res": 270,
+          "meshRes": 269,
+          "source": "Community model"
+        },
+        {
+          "target": "c4",
+          "name": "CS2 C4",
+          "res": 272,
+          "meshRes": 271,
+          "source": "Counter-Strike 2 model by Valve"
+        },
+        {
+          "target": "c4",
+          "name": "Pixel Bomb",
+          "res": 274,
+          "meshRes": 273,
+          "source": "Community model"
         }
       ]
     },

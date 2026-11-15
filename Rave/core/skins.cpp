@@ -387,7 +387,25 @@ namespace
                 target.ktx2 = t["format"].str() == "ktx2";
                 target.meshRes = (int)t["mesh"].number;
                 target.textureRes = (int)t["texture"].number;
-                if (!target.id.empty() && !target.textures.empty())
+                target.paint = t["paint"].type == json::Value::Type::Bool && t["paint"].boolean;
+                target.baseMeshRes = (int)t["baseMesh"].number;
+                target.baseTextureRes = (int)t["baseTexture"].number;
+                for (const json::Value& h : t["hidden"].items)
+                {
+                    skins::HiddenPart part;
+                    part.id = h["id"].str();
+                    part.verts = h["verts"].str();
+                    for (size_t k = 0; k < 3 && k < h["size"].items.size(); ++k)
+                        part.size[k] = (float)h["size"][k].number;
+                    if (part.id.empty())
+                        continue;
+                    for (const json::Value& p : h["prints"].items)
+                        if (p.isString())
+                            seeds[part.id].insert(p.str());
+                    target.hidden.push_back(part);
+                }
+                bool paintable = target.paint && !target.meshes.empty() && target.baseMeshRes && target.baseTextureRes;
+                if (!target.id.empty() && (!target.textures.empty() || paintable))
                     game.targets.push_back(target);
             }
             for (const json::Value& s : g["skins"].items)
@@ -710,7 +728,18 @@ namespace
         size_t target;
         std::string skin;
         bool mesh = false;
+        bool hide = false;
     };
+
+    img::Rgba skinImage(size_t game, size_t target, const std::string& key);
+
+    const skins::HiddenPart* hiddenPart(const Want& want, const std::string& id)
+    {
+        for (const skins::HiddenPart& h : catalog[want.game].targets[want.target].hidden)
+            if (h.id == id)
+                return &h;
+        return nullptr;
+    }
 
     const FileSkin* fileSkin(size_t game, size_t target, const std::string& key)
     {
@@ -771,6 +800,17 @@ namespace
         return false;
     }
 
+    bool paintedMesh(const Want& want, std::string& out)
+    {
+        const skins::Target& t = catalog[want.game].targets[want.target];
+        const FileSkin* f = fileSkin(want.game, want.target, want.skin);
+        std::string model;
+        if (!resource(f && f->meshRes > 0 ? f->meshRes : t.baseMeshRes, model))
+            return false;
+        img::Rgba texture = skinImage(want.game, want.target, want.skin);
+        return !texture.empty() && mesh::paint(model, texture, out);
+    }
+
     std::wstring backupPath(const std::string& entry)
     {
         return originalsDir() + L"\\" + sys::widen(entry) + L".bin";
@@ -792,12 +832,16 @@ namespace
                     auto it = chosen.find(slotKey(g, t));
                     if (it == chosen.end() || it->second.empty())
                         continue;
-                    for (const std::string& tex : catalog[g].targets[t].textures)
+                    const skins::Target& target = catalog[g].targets[t];
+                    for (const std::string& tex : target.textures)
                         wanted[tex] = { g, t, it->second, false };
                     const FileSkin* f = fileSkin(g, t, it->second);
-                    if (f && f->meshRes > 0)
-                        for (const std::string& m : catalog[g].targets[t].meshes)
+                    if (target.paint || (f && f->meshRes > 0))
+                        for (const std::string& m : target.meshes)
                             wanted[m] = { g, t, it->second, true };
+                    if (target.paint)
+                        for (const skins::HiddenPart& h : target.hidden)
+                            wanted[h.id] = { g, t, it->second, true, true };
                 }
             recs = records;
             knownNow = known;
@@ -932,7 +976,8 @@ namespace
                 const Want& w = wanted[tex];
                 if (w.mesh)
                 {
-                    std::vector<size_t> found = findMesh(store, entries, owned, catalog[w.game].targets[w.target].meshVerts);
+                    const skins::HiddenPart* part = w.hide ? hiddenPart(w, tex) : nullptr;
+                    std::vector<size_t> found = findMesh(store, entries, owned, part ? part->verts : catalog[w.game].targets[w.target].meshVerts);
                     for (size_t idx : found)
                     {
                         owned.insert(entries[idx].id);
@@ -976,12 +1021,23 @@ namespace
             std::string shared;
             if (!theme)
             {
-                std::string cacheKey = key + (want.mesh ? "|mesh" : ktx2 ? "|ktx2" : "|png");
+                const skins::HiddenPart* part = want.hide ? hiddenPart(want, tex) : nullptr;
+                std::string cacheKey = slotKey(want.game, want.target) + "|" + key + (part ? "|hide|" + part->id : want.mesh ? "|mesh" : ktx2 ? "|ktx2" : "|png");
                 auto fc = fileCache.find(cacheKey);
                 if (fc == fileCache.end())
                 {
                     std::string bytes;
-                    if (want.mesh)
+                    if (want.hide)
+                    {
+                        if (part)
+                            bytes = mesh::hidden(part->size);
+                    }
+                    else if (want.mesh && catalog[want.game].targets[want.target].paint)
+                    {
+                        if (!paintedMesh(want, bytes))
+                            bytes.clear();
+                    }
+                    else if (want.mesh)
                     {
                         const FileSkin* f = fileSkin(want.game, want.target, key);
                         mesh::Mesh check;
@@ -1131,9 +1187,10 @@ namespace
         if (key.empty() || key.rfind("theme:", 0) == 0)
         {
             std::string png;
-            if (t.textureRes && resource(t.textureRes, png))
+            int textureRes = t.paint && !key.empty() ? t.baseTextureRes : t.textureRes;
+            if (textureRes && resource(textureRes, png))
                 img::decodePng(png.data(), png.size(), base);
-            if (base.empty())
+            if (base.empty() && !t.textures.empty())
                 thumbnail(t.textures[0], base);
             if (key.empty() || base.empty())
                 return base;
@@ -1173,7 +1230,7 @@ namespace
                 {
                     const skins::Target& t = catalog[game].targets[target];
                     const FileSkin* f = fileSkin(game, target, key);
-                    int meshId = f && f->meshRes > 0 ? f->meshRes : t.meshRes;
+                    int meshId = f && f->meshRes > 0 ? f->meshRes : (t.paint && !key.empty() ? t.baseMeshRes : t.meshRes);
                     const mesh::Mesh* model = nullptr;
                     if (meshId)
                     {
