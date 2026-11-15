@@ -46,7 +46,6 @@ namespace skins
     {
         std::string id;
         std::string name;
-        std::string label;
         std::string source;
         bool themes = false;
         std::vector<Target> targets;

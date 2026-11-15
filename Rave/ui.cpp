@@ -1195,7 +1195,7 @@ static void skinsWindow(ImGuiWindow* window)
 		float x = popup->Size.x - 20;
 		for (size_t i = games.size(); i-- > 0;)
 		{
-			std::string label = games[i].label;
+			std::string label = games[i].name;
 			for (char& ch : label)
 				ch = (char)toupper((unsigned char)ch);
 			float wBtn = std::max(120.f, CalcTextSize(label.c_str()).x + 32);

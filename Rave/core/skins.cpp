@@ -362,7 +362,6 @@ namespace
             GameData data;
             game.id = g["id"].str();
             game.name = g["name"].str();
-            game.label = g["label"].str().empty() ? game.name : g["label"].str();
             game.source = g["source"].str();
             game.themes = g["themes"].type == json::Value::Type::Bool && g["themes"].boolean;
             for (const json::Value& t : g["targets"].items)
@@ -987,11 +986,6 @@ namespace
                     }
                     if (found.empty())
                         missing.push_back(tex);
-                    continue;
-                }
-                if (tex.find_first_not_of("0123456789") != std::string::npos)
-                {
-                    missing.push_back(tex);
                     continue;
                 }
                 if (!listed)
