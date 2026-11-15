@@ -87,6 +87,18 @@
           "meshVerts": "73cbea3ea5258b400000c8c1399e6b3f7b8bfcbe0000c8c13ac5093fcc659cbf0000c8c1399e6b3f57a975400000c8c1"
         },
         {
+          "id": "mp5",
+          "name": "MP5",
+          "textures": [
+            "74453061964221"
+          ],
+          "texture": 218,
+          "texturePrints": [
+            "1182:596206425",
+            "855:1133405943"
+          ]
+        },
+        {
           "id": "revolver",
           "name": "Revolver",
           "textures": [
@@ -113,21 +125,9 @@
           ],
           "texture": 220,
           "texturePrints": [
-            "13795:202012879"
-          ],
-          "format": "ktx2"
-        },
-        {
-          "id": "riot-shield",
-          "name": "Riot Shield",
-          "textures": [
-            "82265116"
-          ],
-          "texture": 221,
-          "texturePrints": [
-            "34935:635038846"
-          ],
-          "format": "ktx2"
+            "13795:202012879",
+            "2633:1799129979"
+          ]
         },
         {
           "id": "c4",
@@ -162,6 +162,13 @@
           "res": 235,
           "meshRes": 234,
           "source": "Prison Life community, made by iitkenny"
+        },
+        {
+          "target": "remington",
+          "name": "Oni Bucky",
+          "res": 260,
+          "meshRes": 259,
+          "source": "VALORANT skin by Riot Games"
         },
         {
           "target": "ak47",
@@ -199,6 +206,34 @@
           "source": "Prison Life community, made by iitkenny"
         },
         {
+          "target": "ak47",
+          "name": "Forsaken Vandal White",
+          "res": 248,
+          "meshRes": 247,
+          "source": "VALORANT skin by Riot Games"
+        },
+        {
+          "target": "ak47",
+          "name": "Gaia Vandal Red",
+          "res": 250,
+          "meshRes": 249,
+          "source": "VALORANT skin by Riot Games"
+        },
+        {
+          "target": "ak47",
+          "name": "Prelude Vandal Purple",
+          "res": 252,
+          "meshRes": 251,
+          "source": "VALORANT skin by Riot Games"
+        },
+        {
+          "target": "ak47",
+          "name": "Reaver Vandal Purple",
+          "res": 254,
+          "meshRes": 253,
+          "source": "VALORANT skin by Riot Games"
+        },
+        {
           "target": "revolver",
           "name": "Black",
           "res": 244,
@@ -218,6 +253,20 @@
           "res": 246,
           "meshRes": 243,
           "source": "Prison Life community, made by iitkenny"
+        },
+        {
+          "target": "revolver",
+          "name": "Arcane Sheriff",
+          "res": 256,
+          "meshRes": 255,
+          "source": "VALORANT skin by Riot Games"
+        },
+        {
+          "target": "revolver",
+          "name": "Rogue Bandit",
+          "res": 258,
+          "meshRes": 257,
+          "source": "VALORANT skin by Riot Games"
         }
       ]
     },

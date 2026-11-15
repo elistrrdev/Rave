@@ -885,10 +885,11 @@ namespace
             owned.insert(r.entry);
             keep.push_back(r);
             bool wrongFormat = false;
-            if (!w->second.mesh && catalog[w->second.game].targets[w->second.target].ktx2)
+            if (!w->second.mesh)
             {
+                const img::Kind kind = catalog[w->second.game].targets[w->second.target].ktx2 ? img::Kind::Ktx2 : img::Kind::Png;
                 std::string head;
-                wrongFormat = store.readHead(e, head, 64) && img::probe(head.data(), head.size()).kind != img::Kind::Ktx2;
+                wrongFormat = store.readHead(e, head, 64) && img::probe(head.data(), head.size()).kind != kind;
             }
             if (w->second.skin != r.skin || wrongFormat)
                 toWrite[r.texture].push_back(it->second);
