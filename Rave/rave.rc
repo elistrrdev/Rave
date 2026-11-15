@@ -69,6 +69,22 @@
 272 RCDATA "../games/prison-life/skins/c4/bomb-c4-explosive-model-cs2/CS2 C4.png"
 273 RCDATA "../games/prison-life/skins/c4/counter-strike-pixel-bomb/Pixel Bomb.mesh"
 274 RCDATA "../games/prison-life/skins/c4/counter-strike-pixel-bomb/Pixel Bomb.png"
+275 RCDATA "../games/realistic-home-defense/textures/Glock 26.mesh"
+276 RCDATA "../games/realistic-home-defense/textures/Glock 26.png"
+277 RCDATA "../games/realistic-home-defense/textures/Glock 17 MOS.mesh"
+278 RCDATA "../games/realistic-home-defense/textures/Glock 17 MOS.png"
+279 RCDATA "../games/realistic-home-defense/textures/Glock 19X Auto.mesh"
+280 RCDATA "../games/realistic-home-defense/textures/Glock 19X Auto.png"
+281 RCDATA "../games/realistic-home-defense/textures/Glock 18.mesh"
+282 RCDATA "../games/realistic-home-defense/textures/Glock 18.png"
+283 RCDATA "../games/realistic-home-defense/textures/Colt Anaconda.mesh"
+284 RCDATA "../games/realistic-home-defense/textures/Colt Anaconda.png"
+285 RCDATA "../games/realistic-home-defense/textures/Express 870.mesh"
+286 RCDATA "../games/realistic-home-defense/textures/Express 870.png"
+287 RCDATA "../games/realistic-home-defense/textures/WASR-10.mesh"
+288 RCDATA "../games/realistic-home-defense/textures/WASR-10.png"
+289 RCDATA "../games/realistic-home-defense/textures/Remington 700.mesh"
+290 RCDATA "../games/realistic-home-defense/textures/Remington 700.png"
 
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION RAVE_VERSION_MAJOR,RAVE_VERSION_MINOR,0,0
