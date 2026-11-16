@@ -29,6 +29,14 @@ After that Rave keeps itself up to date. When a new version is out, Rave install
 
 Requires Windows 10 or 11 (64-bit).
 
+## Good to know
+
+- Windows may show "Windows protected your PC" because the installer isn't code signed yet. Click **More info** and then **Run anyway**.
+- Website joins use the account you're signed in with on roblox.com, not the one you picked in Rave. The first time you click Play, your browser asks whether it may open Rave.
+- The best server is picked by a ping estimated from the distance to the server, not a measured one.
+- Everyone who can see your Discord status can see the game you're playing, or that you're in Rave.
+- Bug reports, ideas and help are on the [Discord server](https://discord.gg/8wnFXB8RpC).
+
 ## Source
 
 The code is public so anyone can see what Rave does with their PC and their accounts. That does not make it open source: Rave is proprietary and all rights are reserved. Please read the [license](LICENSE) before using it.
