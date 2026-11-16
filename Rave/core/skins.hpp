@@ -6,7 +6,7 @@
 
 namespace skins
 {
-    enum class Kind { Original, Theme, Embedded, Url, Local };
+    enum class Kind { Original, Theme, Embedded, Local };
     enum class Level { Success, Error, Warn, Info };
     enum class Art { Pending, Ready, Failed };
 
@@ -63,6 +63,7 @@ namespace skins
 
     void requestApply();
     void applyBeforeLaunch();
+    void launchDone();
     std::string status();
 
     std::wstring openFolder(size_t game);

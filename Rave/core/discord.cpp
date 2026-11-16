@@ -4,6 +4,7 @@
 #include "roblox.hpp"
 #include "settings.hpp"
 #include "system.hpp"
+#include "../version.hpp"
 #include <windows.h>
 #include <shlobj.h>
 #include <cstdint>
@@ -16,6 +17,7 @@
 namespace
 {
     const char* kAppId = "1479505409331953827";
+    const char* kLogo = "https://raw.githubusercontent.com/elistrrdev/Rave/main/assets/logo-bg.png";
 
     struct GameInfo
     {
@@ -205,6 +207,15 @@ namespace
         return a;
     }
 
+    std::string launcherActivity(int64_t since)
+    {
+        std::string a = "{\"type\":0,\"details\":\"In the launcher\",\"state\":\"Getting ready to play\"";
+        a += ",\"timestamps\":{\"start\":" + std::to_string(since) + "}";
+        a += ",\"assets\":{\"large_image\":" + json::quote(kLogo) + ",\"large_text\":" + json::quote(RAVE_NAME " V" RAVE_VERSION_STR) + "}";
+        a += ",\"instance\":false}";
+        return a;
+    }
+
     std::wstring newestLog()
     {
         wchar_t* base = nullptr;
@@ -376,71 +387,51 @@ namespace
     {
         CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
         Watcher watcher;
-        bool shown = false;
-        bool dirty = false;
+        std::string shown;
         bool wasRunning = false;
+        int64_t launcherSince = (int64_t)time(nullptr);
         for (;;)
         {
-            Sleep(2000);
             bool enabled = settings::get().discordStatus && discord::configured();
             bool running = roblox::isRunning();
-
-            if (!running)
-            {
-                if (wasRunning)
-                    watcher.reset();
-                wasRunning = false;
-                if (shown)
-                    sendActivity("null");
-                shown = false;
-                closePipe();
-                continue;
-            }
-            if (!wasRunning)
+            if (running != wasRunning)
             {
                 watcher.reset();
-                dirty = true;
+                if (!running)
+                    launcherSince = (int64_t)time(nullptr);
             }
-            wasRunning = true;
+            wasRunning = running;
+            if (running)
+                watcher.poll();
 
-            if (watcher.poll())
-                dirty = true;
+            std::string want;
+            if (enabled && !running)
+                want = "launcher";
+            else if (enabled && watcher.current.universe)
+                want = "game:" + std::to_string(watcher.current.universe) + ":" + std::to_string(watcher.current.place) + ":" + std::to_string(watcher.current.start);
 
-            if (!enabled)
-            {
-                if (shown && sendActivity("null"))
-                    shown = false;
-                if (!shown)
-                    closePipe();
-                dirty = true;
-                continue;
-            }
+            if (pipe == INVALID_HANDLE_VALUE)
+                shown.clear();
 
-            if (!dirty)
+            if (want != shown)
             {
-                if (pipe != INVALID_HANDLE_VALUE)
-                    drain();
-                continue;
+                bool ok = false;
+                if (want.empty())
+                    ok = pipe == INVALID_HANDLE_VALUE || sendActivity("null");
+                else if (want == "launcher")
+                    ok = sendActivity(launcherActivity(launcherSince));
+                else
+                    ok = sendActivity(activityFor(watcher.current));
+                if (ok)
+                    shown = want;
             }
+            else if (pipe != INVALID_HANDLE_VALUE)
+                drain();
 
-            if (watcher.current.universe)
-            {
-                if (sendActivity(activityFor(watcher.current)))
-                {
-                    shown = true;
-                    dirty = false;
-                }
-            }
-            else if (shown)
-            {
-                if (sendActivity("null"))
-                {
-                    shown = false;
-                    dirty = false;
-                }
-            }
-            else
-                dirty = false;
+            if (want.empty() && shown.empty())
+                closePipe();
+
+            Sleep(2000);
         }
     }
 }

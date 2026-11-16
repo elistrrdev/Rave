@@ -1,4 +1,5 @@
 #pragma once
+#include <atomic>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -34,7 +35,7 @@ namespace rbxcache
         bool open(std::string& error);
         void close();
 
-        bool scan(std::vector<Entry>& out);
+        bool scan(std::vector<Entry>& out, const std::atomic<bool>* stop = nullptr);
         bool readBody(const Entry& entry, std::string& body);
         bool readHead(const Entry& entry, std::string& head, size_t bytes);
         bool writeBody(Entry& entry, const std::string& body);

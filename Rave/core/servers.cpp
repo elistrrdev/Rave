@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <map>
+#include <mutex>
 #include <set>
 
 namespace
@@ -40,10 +41,25 @@ namespace
         return std::clamp((int)std::lround(8.0 + distance / 60.0), 1, 999);
     }
 
-    bool getJson(const std::wstring& url, json::Value& out, int* status = nullptr)
+    struct Budget
     {
+        DWORD start = GetTickCount();
+        DWORD limit = 6000;
+        bool over() const { return GetTickCount() - start >= limit; }
+        DWORD left() const
+        {
+            DWORD used = GetTickCount() - start;
+            return used >= limit ? 0 : std::min<DWORD>(limit - used, 4000);
+        }
+    };
+
+    bool getJson(const std::wstring& url, json::Value& out, const Budget& budget, int* status = nullptr)
+    {
+        DWORD wait = budget.left();
+        if (wait < 300)
+            return false;
         net::Response r;
-        bool sent = net::get(url, r, nullptr, L"Accept: application/json\r\n", 15000);
+        bool sent = net::get(url, r, nullptr, L"Accept: application/json\r\n", wait);
         if (status)
             *status = r.status;
         return sent && r.ok() && json::parse(r.body, out);
@@ -58,11 +74,11 @@ namespace
         return 0;
     }
 
-    Here locate()
+    Here locate(const Budget& budget)
     {
         Here h;
         json::Value v;
-        if (getJson(L"https://ipinfo.io/json", v) && v.isObject())
+        if (getJson(L"https://ipinfo.io/json", v, budget) && v.isObject())
         {
             const std::string& loc = v["loc"].str();
             size_t comma = loc.find(',');
@@ -79,7 +95,7 @@ namespace
             return h;
 
         json::Value w;
-        if (getJson(L"https://ipwho.is/", w) && w.isObject() && w["success"].boolean)
+        if (getJson(L"https://ipwho.is/", w, budget) && w.isObject() && w["success"].boolean)
         {
             h.lat = number(w["latitude"]);
             h.lon = number(w["longitude"]);
@@ -90,10 +106,10 @@ namespace
         return h;
     }
 
-    bool datacenters(std::map<int64_t, Spot>& byId, std::vector<Spot>& spots)
+    bool datacenters(std::map<int64_t, Spot>& byId, std::vector<Spot>& spots, const Budget& budget)
     {
         json::Value v;
-        if (!getJson(L"https://apis.rovalra.com/v1/datacenters/list", v) || v.type != json::Value::Type::Array)
+        if (!getJson(L"https://apis.rovalra.com/v1/datacenters/list", v, budget) || v.type != json::Value::Type::Array)
             return false;
         for (const json::Value& item : v.items)
         {
@@ -120,10 +136,10 @@ namespace
         int maxPlayers = 0;
     };
 
-    bool liveServers(uint64_t placeId, std::map<std::string, Live>& out, std::string& error)
+    bool liveServers(uint64_t placeId, std::map<std::string, Live>& out, std::string& error, const Budget& budget)
     {
         std::string cursor;
-        for (int page = 0; page < 5; ++page)
+        for (int page = 0; page < 3 && !budget.over(); ++page)
         {
             std::wstring url = L"https://games.roblox.com/v1/games/" + std::to_wstring(placeId) +
                 L"/servers/Public?limit=100&excludeFullGames=true";
@@ -131,7 +147,7 @@ namespace
                 url += L"&cursor=" + sys::widen(servers::urlEncode(cursor));
             json::Value v;
             int status = 0;
-            if (!getJson(url, v, &status))
+            if (!getJson(url, v, budget, &status))
             {
                 if (page == 0)
                     error = status == 429 ? "Roblox is busy, try again in a minute" : status == 400 ? "This place was not found" : "Could not load the server list";
@@ -148,7 +164,7 @@ namespace
             cursor = v["nextPageCursor"].str();
             if (cursor.empty())
                 break;
-            Sleep(250);
+            Sleep(100);
         }
         return !out.empty();
     }
@@ -188,6 +204,18 @@ namespace
         return {};
     }
 
+    struct Known
+    {
+        std::mutex lock;
+        DWORD hereAt = 0;
+        Here here;
+        DWORD spotsAt = 0;
+        std::map<int64_t, Spot> byId;
+        std::vector<Spot> spots;
+    } known;
+
+    const DWORD kKeep = 30 * 60 * 1000;
+
     bool digitsOnly(const std::string& s)
     {
         return !s.empty() && s.size() <= 19 && std::all_of(s.begin(), s.end(), [](char c) { return c >= '0' && c <= '9'; });
@@ -212,62 +240,49 @@ std::string servers::urlEncode(const std::string& text)
     return out;
 }
 
-bool servers::placeFromText(const std::string& text, uint64_t& placeId)
-{
-    std::string t = text;
-    while (!t.empty() && (t.back() == ' ' || t.back() == '\r' || t.back() == '\n' || t.back() == '/'))
-        t.pop_back();
-    size_t start = t.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos)
-        return false;
-    t = t.substr(start);
-
-    std::string digits;
-    if (digitsOnly(t))
-        digits = t;
-    else
-    {
-        std::string lower = t;
-        for (char& c : lower)
-            c = (char)tolower((unsigned char)c);
-        auto digitsAt = [&](const char* marker) {
-            size_t at = lower.find(marker);
-            if (at == std::string::npos)
-                return std::string();
-            at += strlen(marker);
-            size_t end = at;
-            while (end < t.size() && isdigit((unsigned char)t[end]))
-                ++end;
-            return t.substr(at, end - at);
-        };
-        digits = digitsAt("placeid=");
-        if (digits.empty())
-            digits = digitsAt("/games/");
-    }
-    if (!digitsOnly(digits))
-        return false;
-    placeId = _strtoui64(digits.c_str(), nullptr, 10);
-    return placeId > 0;
-}
-
 servers::Result servers::find(uint64_t placeId)
 {
     Result result;
+    Budget budget;
 
-    Here here = locate();
+    Here here;
+    std::map<int64_t, Spot> byId;
+    std::vector<Spot> spots;
+    {
+        std::lock_guard<std::mutex> guard(known.lock);
+        if (known.here.ok && GetTickCount() - known.hereAt < kKeep)
+            here = known.here;
+        if (!known.spots.empty() && GetTickCount() - known.spotsAt < kKeep)
+        {
+            byId = known.byId;
+            spots = known.spots;
+        }
+    }
     if (!here.ok)
     {
-        result.error = "Could not find your location";
-        return result;
+        here = locate(budget);
+        if (!here.ok)
+        {
+            result.error = "Could not find your location";
+            return result;
+        }
+        std::lock_guard<std::mutex> guard(known.lock);
+        known.here = here;
+        known.hereAt = GetTickCount();
     }
     result.where = here.city.empty() ? here.country : here.city + ", " + here.country;
 
-    std::map<int64_t, Spot> byId;
-    std::vector<Spot> spots;
-    if (!datacenters(byId, spots))
+    if (spots.empty())
     {
-        result.error = "Could not load the Roblox server locations";
-        return result;
+        if (!datacenters(byId, spots, budget))
+        {
+            result.error = "Could not load the Roblox server locations";
+            return result;
+        }
+        std::lock_guard<std::mutex> guard(known.lock);
+        known.byId = byId;
+        known.spots = spots;
+        known.spotsAt = GetTickCount();
     }
 
     std::map<std::string, double> nearest;
@@ -285,7 +300,7 @@ servers::Result servers::find(uint64_t placeId)
 
     std::map<std::string, Live> live;
     std::string error;
-    if (!liveServers(placeId, live, error))
+    if (!liveServers(placeId, live, error, budget))
     {
         result.error = error.empty() ? "No open public server right now" : error;
         return result;
@@ -297,13 +312,13 @@ servers::Result servers::find(uint64_t placeId)
     for (const auto& [distance, code] : countries)
     {
         int countryPing = pingFor(distance);
-        if (asked >= 4 || (bestPing >= 0 && countryPing > bestPing + 25))
+        if (asked >= 3 || budget.over() || (bestPing >= 0 && countryPing > bestPing + 25))
             break;
         ++asked;
 
         json::Value v;
         std::wstring url = L"https://apis.rovalra.com/v1/servers/region?place_id=" + std::to_wstring(placeId) + L"&region=" + sys::widen(code);
-        if (!getJson(url, v) || !v.isObject())
+        if (!getJson(url, v, budget) || !v.isObject())
             continue;
         for (const json::Value& s : v["servers"].items)
         {
@@ -352,12 +367,6 @@ servers::Result servers::find(uint64_t placeId)
         result.list.resize(5);
     result.ok = true;
     return result;
-}
-
-std::string servers::placeLauncherUrl(uint64_t placeId, const std::string& jobId, const std::string& tracker)
-{
-    return "https://www.roblox.com/Game/PlaceLauncher.ashx?request=RequestGameJob&browserTrackerId=" + tracker +
-        "&placeId=" + std::to_string(placeId) + "&gameId=" + jobId + "&isPlayTogetherGame=false";
 }
 
 bool servers::improveWebsiteJoin(std::string& launch, std::string& summary)

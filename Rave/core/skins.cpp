@@ -49,7 +49,6 @@ namespace
         std::string name;
         int res = 0;
         int meshRes = 0;
-        std::string url;
         std::string source;
     };
 
@@ -85,11 +84,14 @@ namespace
     std::mutex localLock;
     std::map<std::string, std::vector<std::wstring>> localFiles;
 
-    std::mutex applyLock;
+    std::timed_mutex applyLock;
     std::mutex wakeLock;
     std::condition_variable wake;
     std::atomic<bool> applyWanted{ false };
     std::atomic<bool> waitingForRoblox{ false };
+    std::atomic<bool> launchHold{ false };
+    std::atomic<bool> heldBack{ false };
+    std::map<std::string, uint32_t> meshChecked;
 
     std::mutex artLock;
     std::condition_variable artWake;
@@ -276,11 +278,6 @@ namespace
         return out;
     }
 
-    bool allowedDownload(const std::string& url)
-    {
-        return url.rfind("https://raw.githubusercontent.com/", 0) == 0;
-    }
-
     bool allowedThumb(const std::string& url)
     {
         if (url.rfind("https://", 0) != 0)
@@ -289,30 +286,6 @@ namespace
         std::string host = url.substr(8, end == std::string::npos ? std::string::npos : end - 8);
         const std::string suffix = ".rbxcdn.com";
         return host.size() > suffix.size() && host.compare(host.size() - suffix.size(), suffix.size(), suffix) == 0;
-    }
-
-    std::wstring urlFile(const std::string& url)
-    {
-        std::string h = sys::sha256Hex(url.data(), url.size());
-        return downloadsDir() + L"\\" + sys::widen(h.substr(0, 24)) + L".png";
-    }
-
-    bool download(const std::string& url, std::string& out)
-    {
-        std::wstring file = urlFile(url);
-        if (readFile(file, out))
-            return true;
-        if (!allowedDownload(url))
-            return false;
-        net::Response r;
-        if (!net::get(sys::widen(url), r, nullptr, L"", 30000) || !r.ok() || r.body.empty() || r.body.size() > (16u << 20))
-            return false;
-        img::Rgba check;
-        if (!img::decodePng(r.body.data(), r.body.size(), check))
-            return false;
-        writeFile(file, r.body);
-        out = std::move(r.body);
-        return true;
     }
 
     bool thumbnail(const std::string& assetId, img::Rgba& out)
@@ -325,9 +298,11 @@ namespace
         {
             if (attempt)
                 Sleep(1500);
+            if (launchHold.load())
+                return false;
             net::Response r;
             std::wstring api = L"https://thumbnails.roblox.com/v1/assets?assetIds=" + sys::widen(assetId) + L"&returnPolicy=PlaceHolder&size=420x420&format=Png&isCircular=false";
-            if (!net::get(api, r, nullptr, L"Accept: application/json\r\n", 15000) || !r.ok())
+            if (!net::get(api, r, nullptr, L"Accept: application/json\r\n", 8000) || !r.ok())
                 continue;
             json::Value v;
             if (!json::parse(r.body, v))
@@ -339,7 +314,7 @@ namespace
             if (!allowedThumb(url))
                 return false;
             net::Response img;
-            if (!net::get(sys::widen(url), img, nullptr, L"", 20000) || !img.ok())
+            if (!net::get(sys::widen(url), img, nullptr, L"", 10000) || !img.ok())
                 continue;
             if (!img::decodePng(img.body.data(), img.body.size(), out))
                 return false;
@@ -415,9 +390,8 @@ namespace
                 f.name = s["name"].str();
                 f.res = (int)s["res"].number;
                 f.meshRes = (int)s["meshRes"].number;
-                f.url = s["url"].str();
                 f.source = s["source"].str();
-                if (!f.target.empty() && !f.name.empty() && (f.res > 0 || allowedDownload(f.url)))
+                if (!f.target.empty() && !f.name.empty() && f.res > 0)
                     data.files.push_back(f);
             }
             if (!game.id.empty() && !game.targets.empty())
@@ -653,7 +627,7 @@ namespace
         if (!scanLoaded)
             loadScan();
         std::vector<Candidate> out;
-        for (size_t i = 0; i < entries.size(); ++i)
+        for (size_t i = 0; i < entries.size() && !launchHold.load(); ++i)
         {
             const rbxcache::Entry& e = entries[i];
             if (owned.count(e.id) || e.bodyLen < 24 || e.bodyLen > (24u << 20))
@@ -750,7 +724,7 @@ namespace
         {
             if (f.target != id)
                 continue;
-            if ((f.res > 0 && key == "res:" + std::to_string(f.res)) || (!f.url.empty() && key == "url:" + f.url))
+            if (f.res > 0 && key == "res:" + std::to_string(f.res))
                 return &f;
         }
         return nullptr;
@@ -764,23 +738,45 @@ namespace
         return out;
     }
 
-    std::vector<size_t> findMesh(rbxcache::Store& store, const std::vector<rbxcache::Entry>& entries, const std::set<std::string>& owned, const std::string& verts)
+    std::map<std::string, std::vector<size_t>> findMeshes(rbxcache::Store& store, const std::vector<rbxcache::Entry>& entries, const std::set<std::string>& owned)
     {
-        std::vector<size_t> out;
-        std::string pattern = unhex(verts);
-        if (pattern.size() < 24)
+        std::vector<std::pair<std::string, std::string>> patterns;
+        for (const skins::Game& g : catalog)
+            for (const skins::Target& t : g.targets)
+            {
+                std::string verts = unhex(t.meshVerts);
+                if (verts.size() >= 24)
+                    for (const std::string& m : t.meshes)
+                        patterns.push_back({ m, verts });
+                for (const skins::HiddenPart& h : t.hidden)
+                {
+                    std::string part = unhex(h.verts);
+                    if (part.size() >= 24)
+                        patterns.push_back({ h.id, part });
+                }
+            }
+        std::map<std::string, std::vector<size_t>> out;
+        if (patterns.empty())
             return out;
-        for (size_t i = 0; i < entries.size(); ++i)
+        for (size_t i = 0; i < entries.size() && !launchHold.load(); ++i)
         {
             const rbxcache::Entry& e = entries[i];
             if (owned.count(e.id) || e.bodyLen < 64 || e.bodyLen > (32u << 20))
                 continue;
-            std::string head;
-            if (!store.readHead(e, head, 12) || head.compare(0, 8, "version ") != 0)
+            auto seen = meshChecked.find(e.id);
+            if (seen != meshChecked.end() && seen->second == e.bodyHash)
                 continue;
-            std::string body;
-            if (store.readBody(e, body) && body.find(pattern) != std::string::npos)
-                out.push_back(i);
+            bool hit = false;
+            std::string head, body;
+            if (store.readHead(e, head, 12) && head.compare(0, 8, "version ") == 0 && store.readBody(e, body))
+                for (const auto& [mesh, verts] : patterns)
+                    if (body.find(verts) != std::string::npos)
+                    {
+                        out[mesh].push_back(i);
+                        hit = true;
+                    }
+            if (!hit)
+                meshChecked[e.id] = e.bodyHash;
         }
         return out;
     }
@@ -790,8 +786,6 @@ namespace
         const std::string& key = want.skin;
         if (key.rfind("res:", 0) == 0)
             return resource(atoi(key.c_str() + 4), out);
-        if (key.rfind("url:", 0) == 0)
-            return download(key.substr(4), out);
         if (key.rfind("local:", 0) == 0)
         {
             const skins::Game& g = catalog[want.game];
@@ -816,9 +810,8 @@ namespace
         return originalsDir() + L"\\" + sys::widen(entry) + L".bin";
     }
 
-    bool runApply(bool scan)
+    bool applyNow(bool scan)
     {
-        std::lock_guard<std::mutex> busy(applyLock);
         HRESULT com = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
 
         std::map<std::string, Want> wanted;
@@ -880,10 +873,28 @@ namespace
         }
 
         std::vector<rbxcache::Entry> entries;
-        if (!store.scan(entries))
+        if (scan)
         {
-            setStatus("Could not read the Roblox cache");
-            return finish(false);
+            if (!store.scan(entries, &launchHold))
+            {
+                if (launchHold.load())
+                {
+                    heldBack = true;
+                    return finish(false);
+                }
+                setStatus("Could not read the Roblox cache");
+                return finish(false);
+            }
+        }
+        else
+        {
+            std::set<std::string> looked;
+            for (const Record& r : recs)
+            {
+                rbxcache::Entry e;
+                if (looked.insert(r.entry).second && store.find(r.entry, e))
+                    entries.push_back(e);
+            }
         }
         std::map<std::string, size_t> byId;
         std::map<std::string, std::vector<size_t>> byPrint;
@@ -971,20 +982,34 @@ namespace
             setStatus("Looking for the originals in the Roblox cache");
             std::vector<Candidate> list;
             bool listed = false;
+            std::map<std::string, std::vector<size_t>> meshHits;
+            bool meshesListed = false;
             for (const std::string& tex : unresolved)
             {
+                if (launchHold.load())
+                    break;
                 const Want& w = wanted[tex];
                 if (w.mesh)
                 {
-                    const skins::HiddenPart* part = w.hide ? hiddenPart(w, tex) : nullptr;
-                    std::vector<size_t> found = findMesh(store, entries, owned, part ? part->verts : catalog[w.game].targets[w.target].meshVerts);
-                    for (size_t idx : found)
+                    if (!meshesListed)
                     {
-                        owned.insert(entries[idx].id);
-                        toWrite[tex].push_back(idx);
-                        knownNow[tex].insert(fingerprint(entries[idx].bodyLen, entries[idx].bodyHash));
+                        meshHits = findMeshes(store, entries, owned);
+                        meshesListed = true;
+                        for (const auto& [mesh, hits] : meshHits)
+                            for (size_t idx : hits)
+                                knownNow[mesh].insert(fingerprint(entries[idx].bodyLen, entries[idx].bodyHash));
                     }
-                    if (found.empty())
+                    bool any = false;
+                    auto hit = meshHits.find(tex);
+                    if (hit != meshHits.end())
+                        for (size_t idx : hit->second)
+                            if (!owned.count(entries[idx].id))
+                            {
+                                owned.insert(entries[idx].id);
+                                toWrite[tex].push_back(idx);
+                                any = true;
+                            }
+                    if (!any)
                         missing.push_back(tex);
                     continue;
                 }
@@ -1008,6 +1033,12 @@ namespace
                 if (found.empty())
                     missing.push_back(tex);
             }
+        }
+
+        if (scan && launchHold.load())
+        {
+            heldBack = true;
+            return finish(false);
         }
 
         std::map<std::string, std::string> fileCache;
@@ -1149,6 +1180,22 @@ namespace
         return finish(true);
     }
 
+    bool runApply(bool scan)
+    {
+        if (scan && launchHold.load())
+        {
+            heldBack = true;
+            return false;
+        }
+        std::lock_guard<std::timed_mutex> busy(applyLock);
+        if (scan && launchHold.load())
+        {
+            heldBack = true;
+            return false;
+        }
+        return applyNow(scan);
+    }
+
     void applyWorker()
     {
         bool wasRunning = false;
@@ -1285,6 +1332,20 @@ namespace
 void skins::init(Logger l)
 {
     logger = std::move(l);
+    {
+        WIN32_FIND_DATAW fd;
+        std::wstring dir = downloadsDir();
+        HANDLE h = FindFirstFileW((dir + L"\\*.png").c_str(), &fd);
+        if (h != INVALID_HANDLE_VALUE)
+        {
+            do
+            {
+                if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && _wcsnicmp(fd.cFileName, L"thumb-", 6) != 0)
+                    DeleteFileW((dir + L"\\" + fd.cFileName).c_str());
+            } while (FindNextFileW(h, &fd));
+            FindClose(h);
+        }
+    }
     loadCatalog();
     {
         std::lock_guard<std::mutex> guard(stateLock);
@@ -1314,10 +1375,7 @@ std::vector<skins::Skin> skins::list(size_t game, size_t target)
         if (f.target != t.id)
             continue;
         std::string source = f.source.empty() ? g.source : f.source;
-        if (f.res > 0)
-            out.push_back({ "res:" + std::to_string(f.res), f.name, source, Kind::Embedded, f.meshRes > 0 });
-        else
-            out.push_back({ "url:" + f.url, f.name, source, Kind::Url });
+        out.push_back({ "res:" + std::to_string(f.res), f.name, source, Kind::Embedded, f.meshRes > 0 });
     }
     if (g.themes)
         for (const Theme& th : kThemes)
@@ -1385,8 +1443,23 @@ void skins::requestApply()
 
 void skins::applyBeforeLaunch()
 {
-    applyWanted = false;
-    runApply(false);
+    std::unique_lock<std::timed_mutex> busy(applyLock, std::defer_lock);
+    bool got = busy.try_lock_for(std::chrono::seconds(2));
+    launchHold = true;
+    if (!got && !busy.try_lock_for(std::chrono::seconds(8)))
+    {
+        heldBack = true;
+        log("Skins are still being prepared, they are applied when Roblox closes", Level::Info);
+        return;
+    }
+    applyNow(false);
+}
+
+void skins::launchDone()
+{
+    launchHold = false;
+    if (heldBack.exchange(false))
+        requestApply();
 }
 
 std::string skins::status()

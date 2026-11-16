@@ -23,9 +23,7 @@ namespace servers
         std::vector<Server> list;
     };
 
-    bool placeFromText(const std::string& text, uint64_t& placeId);
     Result find(uint64_t placeId);
     bool improveWebsiteJoin(std::string& launch, std::string& summary);
-    std::string placeLauncherUrl(uint64_t placeId, const std::string& jobId, const std::string& tracker);
     std::string urlEncode(const std::string& text);
 }

@@ -54,7 +54,7 @@ static bool handToRunningRave(const std::wstring& join)
     data.cbData = (DWORD)(join.size() * sizeof(wchar_t));
     data.lpData = (void*)join.data();
     DWORD_PTR result = 0;
-    return SendMessageTimeoutW(existing, WM_COPYDATA, 0, (LPARAM)&data, SMTO_ABORTIFHUNG, 5000, &result) && result == TRUE;
+    return SendMessageTimeoutW(existing, WM_COPYDATA, 0, (LPARAM)&data, SMTO_ABORTIFHUNG, 2000, &result) && result == TRUE;
 }
 
 static bool focusExistingInstance()
@@ -82,9 +82,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         ExitProcess(0);
     }
 
-    if (!net::hasInternet())
-        ExitProcess(0);
-
     std::wstring join = websiteJoinArg();
 
     app::instanceMutex = CreateMutexW(nullptr, TRUE, app::mutexName);
@@ -93,7 +90,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     {
         if (!join.empty())
         {
-            for (int i = 0; i < 50 && !handToRunningRave(join); ++i)
+            DWORD started = GetTickCount();
+            while (!handToRunningRave(join) && GetTickCount() - started < 5000)
                 Sleep(100);
             SecureZeroMemory(join.data(), join.size() * sizeof(wchar_t));
             ExitProcess(0);
@@ -102,6 +100,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             Sleep(100);
         ExitProcess(0);
     }
+
+    if (!net::hasInternet())
+        ExitProcess(0);
 
     paths::localData();
     settings::load();

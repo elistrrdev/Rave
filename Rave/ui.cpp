@@ -3,8 +3,8 @@
 #include "core/discord.hpp"
 #include "core/fflags.hpp"
 #include "core/launcher.hpp"
+#include "core/paths.hpp"
 #include "core/protocol.hpp"
-#include "core/servers.hpp"
 #include "core/settings.hpp"
 #include "core/skins.hpp"
 #include "core/sysinfo.hpp"
@@ -226,8 +226,9 @@ void ui::BeforeLoop(ID3D11Device* dvc) {
 	if (settings::get().websiteJoins && !protocol::registered())
 	{
 		std::string error;
+		bool before = paths::exists(paths::localData() + L"\\protocol.json");
 		if (protocol::enable(error))
-			items::sendLog("Rave took the website joins back from the Roblox launcher", logType::info);
+			items::sendLog(before ? "Rave took the website joins back from the Roblox launcher" : "Play on roblox.com now starts Roblox through Rave", logType::info);
 	}
 	discord::start();
 	updater::start(window::dx::hwnd);
@@ -449,52 +450,6 @@ namespace skinui
 	}
 }
 
-namespace finder
-{
-	static bool openRequest = false;
-	static char link[512];
-	static const char* kPopup = "BEST SERVER";
-
-	static std::mutex lock;
-	static bool busy = false;
-	static uint64_t place = 0;
-	static servers::Result result;
-	static unsigned generation = 0;
-
-	static void open()
-	{
-		openRequest = true;
-	}
-
-	static void close()
-	{
-		ClearActiveID();
-		CloseCurrentPopup();
-	}
-
-	static void search(uint64_t placeId)
-	{
-		unsigned gen;
-		{
-			std::lock_guard<std::mutex> guard(lock);
-			busy = true;
-			place = placeId;
-			result = {};
-			gen = ++generation;
-		}
-		std::thread([placeId, gen] {
-			CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-			servers::Result found = servers::find(placeId);
-			CoUninitialize();
-			std::lock_guard<std::mutex> guard(lock);
-			if (gen != generation)
-				return;
-			result = std::move(found);
-			busy = false;
-		}).detach();
-	}
-}
-
 static void homePage(ImGuiWindow* window)
 {
 	SetCursorPos({ 20, 100 });
@@ -518,12 +473,8 @@ static void homePage(ImGuiWindow* window)
 			const float third = std::floor((row - 24) / 3);
 
 			SetCursorPosX(20);
-			if (items::button(launchLabel() + "###LAUNCH", { row - third - 12, 45 }))
+			if (items::button(launchLabel() + "###LAUNCH", { row, 45 }))
 				launcher::launch();
-
-			SameLine();
-			if (items::button("BEST SERVER", { third, 45 }))
-				finder::open();
 
 			SetCursorPosX(20);
 			if (items::button("FFLAGS EDITOR", { third, 45 }))
@@ -1168,7 +1119,7 @@ static void settingsWindow(ImGuiWindow* window)
 		const Switch switches[] = {
 			{ "WEBSITE JOINS", "Play on roblox.com starts Roblox through Rave. These joins use the account signed in on the website, not the one chosen in Rave.", &prefs::draft.websiteJoins },
 			{ "BEST SERVER", "Website joins go to the open server closest to you. Not used for friends or private servers.", &prefs::draft.bestServer },
-			{ "DISCORD STATUS", "Shows the game you play in your Discord status while Discord is open on this PC.", &prefs::draft.discordStatus },
+			{ "DISCORD STATUS", "Shows the game you play, or that you are in Rave, in your Discord status while Discord is open on this PC.", &prefs::draft.discordStatus },
 		};
 		const _V2 toggle = { 58, 32 };
 		const float noteW = inner - toggle.x * 2 - 6 - 20;
@@ -1427,138 +1378,6 @@ static void skinsWindow(ImGuiWindow* window)
 	PopStyleVar();
 }
 
-static void bestServerWindow(ImGuiWindow* window)
-{
-	if (finder::openRequest)
-	{
-		OpenPopup(finder::kPopup);
-		finder::openRequest = false;
-	}
-
-	const _V2 size = { 560, 410 };
-	SetNextWindowPos(window->Pos + (window->Size - size) / 2, ImGuiCond_Always);
-	SetNextWindowSize(size, ImGuiCond_Always);
-
-	PushStyleVar(ImGuiStyleVar_WindowPadding, { 0, 0 });
-	if (!BeginPopupModal(finder::kPopup, nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoSavedSettings))
-	{
-		PopStyleVar();
-		return;
-	}
-
-	if (IsKeyPressed(ImGuiKey_Escape, false))
-	{
-		finder::close();
-		EndPopup();
-		PopStyleVar();
-		return;
-	}
-
-	ImGuiWindow* popup = GetCurrentWindow();
-	const float inner = popup->Size.x - 40;
-
-	SetCursorPos({ 20, 20 });
-	misc::renderMulticolorText({ "BEST ", "SERVER" }, { f.montS[1], f.montS[1] }, { colors::Main, colors::Lwhite });
-
-	PushFont(f.montM[0]);
-
-	wrapText(popup, { 20, 64 }, colors::Lwhite, "Paste a Roblox game link or a place id. Rave looks for the open server closest to you.", inner);
-
-	bool busy;
-	uint64_t place;
-	servers::Result result;
-	{
-		std::lock_guard<std::mutex> guard(finder::lock);
-		busy = finder::busy;
-		place = finder::place;
-		result = finder::result;
-	}
-
-	const float gap = 10;
-	const _V2 findSize = { 120, 38 };
-	const _V2 boxPos = { 20, 108 };
-	const _V2 boxSize = { inner - findSize.x - gap, 38 };
-	PushStyleVar(ImGuiStyleVar_FramePadding, { 12, 10 });
-	PushStyleVar(ImGuiStyleVar_FrameRounding, 6.f);
-	const _V4 boxColor = RGBA(255, 255, 255, 12);
-	PushStyleColor(ImGuiCol_FrameBg, boxColor);
-	PushStyleColor(ImGuiCol_FrameBgHovered, boxColor);
-	PushStyleColor(ImGuiCol_FrameBgActive, boxColor);
-	PushStyleColor(ImGuiCol_Text, colors::Lwhite);
-	SetCursorPos(boxPos);
-	SetNextItemWidth(boxSize.x);
-	bool entered = InputText("##gamelink", finder::link, sizeof(finder::link), ImGuiInputTextFlags_EnterReturnsTrue);
-	bool active = IsItemActive();
-	PopStyleColor(4);
-	PopStyleVar(2);
-	if (finder::link[0] == 0 && !active)
-		popup->DrawList->AddText(popup->Pos + boxPos + _V2(12, 10), _CO(colors::Info), "https://www.roblox.com/games/...");
-
-	SetCursorPos({ 20 + boxSize.x + gap, boxPos.y });
-	if ((items::button(busy ? "SEARCHING...###FIND" : "FIND###FIND", findSize) || entered) && !busy)
-	{
-		uint64_t id = 0;
-		if (servers::placeFromText(finder::link, id))
-			finder::search(id);
-		else
-		{
-			std::lock_guard<std::mutex> guard(finder::lock);
-			finder::result = {};
-			finder::result.error = "That is not a Roblox game link or place id";
-			finder::place = 0;
-		}
-	}
-
-	std::string message;
-	_V4 messageColor = colors::Gray;
-	if (busy)
-		message = "Looking at the open servers and where they are...";
-	else if (!result.error.empty())
-	{
-		message = result.error;
-		messageColor = colors::Red;
-	}
-	else if (result.ok)
-		message = "Closest open servers to " + result.where + " (the ping is an estimate):";
-	else
-		message = "Your location comes from your IP, the server locations from the RoValra API.";
-	wrapText(popup, { 20, 160 }, messageColor, message, inner);
-
-	if (result.ok && !busy)
-	{
-		float y = 188;
-		const _V2 joinSize = { 90, 28 };
-		for (size_t i = 0; i < result.list.size(); ++i)
-		{
-			const servers::Server& srv = result.list[i];
-			_V2 rowPos = popup->Pos + _V2(20, y);
-			popup->DrawList->AddRectFilled(rowPos, rowPos + _V2(inner, 30), _CO(_V4(RGBA(255, 255, 255, i == 0 ? 18 : 9))), 6.f);
-			if (i == 0)
-				popup->DrawList->AddRect(rowPos, rowPos + _V2(inner, 30), _CO(colors::Main), 6.f, 0, 1.f);
-			std::string where = srv.city.empty() ? srv.country : srv.city + ", " + srv.country;
-			draw::text(skinui::ellipsize(where, 200), { 32, y + 6 }, colors::Lwhite);
-			draw::text("about " + std::to_string(srv.ping) + " ms", { 250, y + 6 }, i == 0 ? colors::Main : colors::Gray);
-			draw::text(std::to_string(srv.playing) + "/" + std::to_string(srv.maxPlayers) + " players", { 350, y + 6 }, colors::Gray);
-			SetCursorPos({ 20 + inner - joinSize.x - 1, y + 1 });
-			if (items::choice("JOIN##server" + std::to_string(i), i == 0, joinSize) && launcher::task() == launcher::Task::Idle)
-			{
-				launcher::joinServer(place, srv.id);
-				finder::close();
-			}
-			y += 32;
-		}
-	}
-
-	SetCursorPos({ 20, popup->Size.y - 20 - 40 });
-	if (items::button("CLOSE", { inner, 40 }))
-		finder::close();
-
-	PopFont();
-
-	EndPopup();
-	PopStyleVar();
-}
-
 void ui::Render() {
 	static Tab tab = Tab::Home;
 	const Tab shownTab = tab;
@@ -1610,7 +1429,6 @@ void ui::Render() {
 		settingsWindow(window);
 		addAccountWindow(window);
 		skinsWindow(window);
-		bestServerWindow(window);
 	}
 	ImGui::End();
 }

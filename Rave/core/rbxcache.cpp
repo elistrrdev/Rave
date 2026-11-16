@@ -4,6 +4,8 @@
 #include "__ext/sqlite/sqlite3.h"
 #include <windows.h>
 #include <cstring>
+#include <map>
+#include <mutex>
 
 namespace
 {
@@ -115,6 +117,54 @@ namespace
         if (!ok)
             DeleteFileW(tmp.c_str());
         return ok;
+    }
+
+    struct Listed
+    {
+        uint64_t size = 0;
+        uint64_t time = 0;
+    };
+
+    struct Seen
+    {
+        Listed file;
+        rbxcache::Entry entry;
+    };
+
+    std::mutex seenLock;
+    std::map<std::string, Seen> seenFiles;
+
+    std::map<std::string, Listed> listStorage(const std::wstring& root)
+    {
+        std::map<std::string, Listed> out;
+        WIN32_FIND_DATAW fd;
+        HANDLE top = FindFirstFileExW((root + L"\\*").c_str(), FindExInfoBasic, &fd, FindExSearchLimitToDirectories, nullptr, FIND_FIRST_EX_LARGE_FETCH);
+        if (top == INVALID_HANDLE_VALUE)
+            return out;
+        std::vector<std::wstring> folders;
+        do
+        {
+            if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && wcslen(fd.cFileName) == 2)
+                folders.push_back(fd.cFileName);
+        } while (FindNextFileW(top, &fd));
+        FindClose(top);
+        for (const std::wstring& folder : folders)
+        {
+            HANDLE h = FindFirstFileExW((root + L"\\" + folder + L"\\*").c_str(), FindExInfoBasic, &fd, FindExSearchNameMatch, nullptr, FIND_FIRST_EX_LARGE_FETCH);
+            if (h == INVALID_HANDLE_VALUE)
+                continue;
+            do
+            {
+                if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY || wcslen(fd.cFileName) != 32)
+                    continue;
+                Listed l;
+                l.size = ((uint64_t)fd.nFileSizeHigh << 32) | fd.nFileSizeLow;
+                l.time = ((uint64_t)fd.ftLastWriteTime.dwHighDateTime << 32) | fd.ftLastWriteTime.dwLowDateTime;
+                out[sys::narrow(fd.cFileName)] = l;
+            } while (FindNextFileW(h, &fd));
+            FindClose(h);
+        }
+        return out;
     }
 
     struct Statement
@@ -234,11 +284,12 @@ std::wstring rbxcache::Store::filePath(const std::string& id) const
     return dir + L"\\rbx-storage\\" + sys::widen(id.substr(0, 2)) + L"\\" + sys::widen(id);
 }
 
-bool rbxcache::Store::scan(std::vector<Entry>& out)
+bool rbxcache::Store::scan(std::vector<Entry>& out, const std::atomic<bool>* stop)
 {
     out.clear();
     if (!db)
         return false;
+    auto stopped = [&] { return stop && stop->load(); };
     {
         Statement q(db, "SELECT id, content FROM files WHERE category = ?1 AND content IS NOT NULL");
         if (!q.s)
@@ -246,6 +297,8 @@ bool rbxcache::Store::scan(std::vector<Entry>& out)
         sqlite3_bind_int(q.s, 1, kContentCategory);
         while (sqlite3_step(q.s) == SQLITE_ROW)
         {
+            if (stopped())
+                return false;
             if (sqlite3_column_bytes(q.s, 0) != 16)
                 continue;
             Entry e;
@@ -265,21 +318,48 @@ bool rbxcache::Store::scan(std::vector<Entry>& out)
         if (!q.s)
             return false;
         sqlite3_bind_int(q.s, 1, kContentCategory);
+        std::map<std::string, Listed> listed = listStorage(dir + L"\\rbx-storage");
+        std::lock_guard<std::mutex> guard(seenLock);
+        std::map<std::string, Seen> still;
         std::string head;
         while (sqlite3_step(q.s) == SQLITE_ROW)
         {
+            if (stopped())
+            {
+                for (auto& [id, seen] : still)
+                    seenFiles[id] = seen;
+                return false;
+            }
             if (sqlite3_column_bytes(q.s, 0) != 16)
                 continue;
             Entry e;
             e.id = toHex(sqlite3_column_blob(q.s, 0), 16);
+            auto file = listed.find(e.id);
+            if (file == listed.end())
+                continue;
+            auto seen = seenFiles.find(e.id);
+            if (seen != seenFiles.end() && seen->second.file.size == file->second.size && seen->second.file.time == file->second.time)
+            {
+                still[e.id] = seen->second;
+                if (seen->second.entry.bodyLen || seen->second.entry.bodyOffset)
+                    out.push_back(seen->second.entry);
+                continue;
+            }
             uint64_t total = 0;
             if (!readFile(filePath(e.id), head, 4096, total))
                 continue;
             e.inlined = false;
             e.size = (uint32_t)total;
+            Seen record;
+            record.file = file->second;
             if (parseHeader((const uint8_t*)head.data(), head.size(), total, e))
+            {
                 out.push_back(e);
+                record.entry = e;
+            }
+            still[e.id] = record;
         }
+        seenFiles = std::move(still);
     }
     return true;
 }

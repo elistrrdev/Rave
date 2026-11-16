@@ -29,6 +29,13 @@ namespace
     std::atomic<bool> seenRunning{ false };
     std::atomic<bool> hiddenByRave{ false };
     std::atomic<DWORD> watchStarted{ 0 };
+    std::atomic<bool> skinsHeld{ false };
+
+    void releaseSkins()
+    {
+        if (skinsHeld.exchange(false))
+            skins::launchDone();
+    }
 
     void log(const std::string& text, launcher::LogLevel level)
     {
@@ -91,6 +98,7 @@ namespace
         {
             missing = 0;
             seenRunning = true;
+            releaseSkins();
             if (behaviorPending.exchange(false))
                 applyStartBehavior();
             return;
@@ -102,6 +110,7 @@ namespace
             {
                 watching = false;
                 behaviorPending = false;
+                releaseSkins();
             }
             return;
         }
@@ -118,14 +127,12 @@ namespace
             windowAction(launcher::WindowRestore);
     }
 
-    enum class JobKind { App, Website, Server };
+    enum class JobKind { App, Website };
 
     struct Job
     {
         JobKind kind = JobKind::App;
         std::string website;
-        uint64_t placeId = 0;
-        std::string jobId;
     };
 
     uint64_t unixMs()
@@ -171,18 +178,6 @@ namespace
             L"+channel:+LaunchExp:InApp";
     }
 
-    std::wstring serverArgs(const std::string& ticket, uint64_t placeId, const std::string& jobId)
-    {
-        std::string tracker = trackerId();
-        std::wstring locale = robloxLocale();
-        return L"roblox-player:1+launchmode:play+gameinfo:" + sys::widen(ticket) +
-            L"+launchtime:" + std::to_wstring(unixMs()) +
-            L"+placelauncherurl:" + sys::widen(servers::urlEncode(servers::placeLauncherUrl(placeId, jobId, tracker))) +
-            L"+browsertrackerid:" + sys::widen(tracker) +
-            L"+robloxLocale:" + locale + L"+gameLocale:" + locale +
-            L"+channel:";
-    }
-
     void wipe(std::string& s)
     {
         if (!s.empty())
@@ -203,20 +198,41 @@ namespace
 
         currentTask = launcher::Task::Checking;
         currentProgress = 0.f;
+
+        bool bestFound = false;
+        std::string bestSummary;
+        std::thread best;
+        if (job.kind == JobKind::Website && settings::get().bestServer)
+        {
+            log("Looking for the best server", launcher::LogLevel::Info);
+            best = std::thread([&job, &bestFound, &bestSummary] { bestFound = servers::improveWebsiteJoin(job.website, bestSummary); });
+        }
+        struct Joiner
+        {
+            std::thread& t;
+            ~Joiner() { if (t.joinable()) t.join(); }
+        } joiner{ best };
+
         log("Checking the latest Roblox version", launcher::LogLevel::Info);
 
         roblox::Latest latest;
         std::string error;
-        if (!roblox::fetchLatest(latest, error))
+        std::string installed = roblox::installedGuid();
+        if (roblox::fetchLatest(latest, error))
+            storeLatest(latest.guid);
+        else if (!installed.empty())
+        {
+            latest.guid = installed;
+            log("Could not check the Roblox version (" + error + "), starting the installed one", launcher::LogLevel::Warn);
+        }
+        else
         {
             failWithReport("Version check failed", error);
             currentTask = launcher::Task::Idle;
             CoUninitialize();
             return;
         }
-        storeLatest(latest.guid);
 
-        std::string installed = roblox::installedGuid();
         if (installed != latest.guid)
         {
             currentTask = launcher::Task::Installing;
@@ -231,13 +247,19 @@ namespace
             roblox::removeOldVersions(latest.guid);
             log("Roblox " + latest.version + " installed", launcher::LogLevel::Success);
         }
-        else
+        else if (!latest.version.empty())
         {
             log("Roblox is up to date", launcher::LogLevel::Success);
         }
 
         currentTask = launcher::Task::Launching;
         skins::applyBeforeLaunch();
+        skinsHeld = true;
+        struct Release
+        {
+            bool on = true;
+            ~Release() { if (on) releaseSkins(); }
+        } release;
         if (!fflags::apply(roblox::versionDir(latest.guid)))
             log("Could not apply the FFlags", launcher::LogLevel::Warn);
 
@@ -245,41 +267,17 @@ namespace
         uint64_t accountId = accounts::selected();
         if (job.kind == JobKind::Website)
         {
-            if (settings::get().bestServer)
+            if (best.joinable())
             {
-                log("Looking for the best server", launcher::LogLevel::Info);
-                std::string summary;
-                if (servers::improveWebsiteJoin(job.website, summary))
-                    log("Best server: " + summary, launcher::LogLevel::Success);
-                else if (!summary.empty())
-                    log(summary + ", Roblox picks the server", launcher::LogLevel::Warn);
+                best.join();
+                if (bestFound)
+                    log("Best server: " + bestSummary, launcher::LogLevel::Success);
+                else if (!bestSummary.empty())
+                    log(bestSummary + ", Roblox picks the server", launcher::LogLevel::Warn);
             }
             args = sys::widen(job.website);
             wipe(job.website);
             log("Joining from the website (with the account signed in there)", launcher::LogLevel::Info);
-        }
-        else if (job.kind == JobKind::Server)
-        {
-            if (accountId)
-            {
-                accounts::Account who;
-                std::string ticket;
-                if (!accounts::ticket(accountId, ticket, who, error))
-                {
-                    log("Sign-in failed: " + error, launcher::LogLevel::Error);
-                    currentTask = launcher::Task::Idle;
-                    CoUninitialize();
-                    return;
-                }
-                args = serverArgs(ticket, job.placeId, job.jobId);
-                wipe(ticket);
-                log("Joining the server as " + accounts::label(who), launcher::LogLevel::Info);
-            }
-            else
-            {
-                args = L"roblox://experiences/start?placeId=" + std::to_wstring(job.placeId) + L"&gameInstanceId=" + sys::widen(job.jobId);
-                log("Joining the server", launcher::LogLevel::Info);
-            }
         }
         else if (accountId)
         {
@@ -293,6 +291,7 @@ namespace
                 return;
             }
             args = signedInArgs(ticket);
+            wipe(ticket);
             log("Launching Roblox as " + accounts::label(who), launcher::LogLevel::Info);
         }
         else
@@ -323,6 +322,8 @@ namespace
         seenRunning = false;
         behaviorPending = true;
         watching = true;
+        if (!started)
+            release.on = false;
 
         currentTask = launcher::Task::Idle;
         CoUninitialize();
@@ -380,21 +381,6 @@ void launcher::launchWebsite(std::string launchString)
     Job job;
     job.kind = JobKind::Website;
     job.website = std::move(launchString);
-    std::thread(runLaunch, std::move(job)).detach();
-}
-
-void launcher::joinServer(uint64_t placeId, const std::string& jobId)
-{
-    Task expected = Task::Idle;
-    if (!currentTask.compare_exchange_strong(expected, Task::Checking))
-    {
-        log("Rave is busy, please wait", LogLevel::Info);
-        return;
-    }
-    Job job;
-    job.kind = JobKind::Server;
-    job.placeId = placeId;
-    job.jobId = jobId;
     std::thread(runLaunch, std::move(job)).detach();
 }
 

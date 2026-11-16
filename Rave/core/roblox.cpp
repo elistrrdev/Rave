@@ -117,7 +117,7 @@ namespace
 bool roblox::fetchLatest(Latest& out, std::string& error)
 {
     net::Response r;
-    if (!net::get(kVersionUrl, r) || !r.ok())
+    if (!net::get(kVersionUrl, r, nullptr, L"", 8000) || !r.ok())
     {
         error = "could not reach the Roblox version service";
         return false;
