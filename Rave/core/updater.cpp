@@ -203,3 +203,8 @@ void updater::start(HWND window)
 {
     std::thread([window] { run(window); }).detach();
 }
+
+bool updater::installedCopy()
+{
+    return runsInstalled();
+}

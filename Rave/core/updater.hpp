@@ -4,4 +4,5 @@
 namespace updater
 {
     void start(HWND window);
+    bool installedCopy();
 }

@@ -89,6 +89,7 @@ namespace prefs
 	static settings::Values draft, original;
 	static int page = 0;
 	static const char* kPopup = "SETTINGS";
+	static bool testBuild = false;
 
 	static void open()
 	{
@@ -99,6 +100,8 @@ namespace prefs
 
 	static void saveAndClose()
 	{
+		if (testBuild)
+			draft.websiteJoins = original.websiteJoins;
 		if (draft.websiteJoins != original.websiteJoins)
 		{
 			std::string error;
@@ -223,7 +226,14 @@ void ui::BeforeLoop(ID3D11Device* dvc) {
 		items::sendLog(text, type);
 	});
 	launcher::startMonitor();
-	if (settings::get().websiteJoins && !protocol::registered())
+	prefs::testBuild = !updater::installedCopy();
+	if (prefs::testBuild)
+	{
+		std::string error;
+		if (protocol::registered() && protocol::disable(error))
+			items::sendLog("Website joins are off in the test build, the installed Rave takes them again", logType::info);
+	}
+	else if (settings::get().websiteJoins && !protocol::registered())
 	{
 		std::string error;
 		bool fromRave = protocol::otherRave();
@@ -1118,9 +1128,9 @@ static void settingsWindow(ImGuiWindow* window)
 	{
 		struct Switch { const char* label; const char* note; bool* value; };
 		const Switch switches[] = {
-			{ "WEBSITE JOINS", "Play on roblox.com starts Roblox through Rave. These joins use the account signed in on the website, not the one chosen in Rave.", &prefs::draft.websiteJoins },
+			{ "WEBSITE JOINS", "Play on roblox.com starts Roblox through Rave, with the website's account.", &prefs::draft.websiteJoins },
 			{ "BEST SERVER", "Website joins go to the open server closest to you. Not used for friends or private servers.", &prefs::draft.bestServer },
-			{ "DISCORD STATUS", "Shows the game you play, or that you are in Rave, in your Discord status while Discord is open on this PC.", &prefs::draft.discordStatus },
+			{ "DISCORD STATUS", "Shows your game, or that you are in Rave, in your Discord status.", &prefs::draft.discordStatus },
 		};
 		const _V2 toggle = { 58, 32 };
 		const float noteW = inner - toggle.x * 2 - 6 - 20;
@@ -1128,15 +1138,23 @@ static void settingsWindow(ImGuiWindow* window)
 		float y = 70;
 		for (int i = 0; i < 3; ++i)
 		{
-			draw::text(switches[i].label, { 20, y }, colors::Lwhite);
-			wrapText(popup, { 20, y + 22 }, colors::Gray, switches[i].note, noteW);
+			const bool locked = i == 0 && prefs::testBuild;
+			bool off = false;
+			bool* value = locked ? &off : switches[i].value;
+			const char* note = locked ? "Off in the test build. Only the installed Rave takes website joins." : switches[i].note;
+			if (locked)
+				BeginDisabled();
+			draw::text(switches[i].label, { 20, y }, locked ? colors::Gray : colors::Lwhite);
+			float noteH = wrapText(popup, { 20, y + 22 }, colors::Gray, note, noteW);
 			SetCursorPos({ bx, y + 6 });
-			if (items::choice(std::string("ON##switch") + std::to_string(i), *switches[i].value, toggle))
-				*switches[i].value = true;
+			if (items::choice(std::string("ON##switch") + std::to_string(i), *value, toggle))
+				*value = true;
 			SetCursorPos({ bx + toggle.x + 6, y + 6 });
-			if (items::choice(std::string("OFF##switch") + std::to_string(i), !*switches[i].value, toggle))
-				*switches[i].value = false;
-			y += 74;
+			if (items::choice(std::string("OFF##switch") + std::to_string(i), !*value, toggle))
+				*value = false;
+			if (locked)
+				EndDisabled();
+			y += 22 + std::max(noteH, 20.f) + 18;
 		}
 	}
 
