@@ -226,9 +226,10 @@ void ui::BeforeLoop(ID3D11Device* dvc) {
 	if (settings::get().websiteJoins && !protocol::registered())
 	{
 		std::string error;
+		bool fromRave = protocol::otherRave();
 		bool before = paths::exists(paths::localData() + L"\\protocol.json");
 		if (protocol::enable(error))
-			items::sendLog(before ? "Rave took the website joins back from the Roblox launcher" : "Play on roblox.com now starts Roblox through Rave", logType::info);
+			items::sendLog(fromRave ? "Website joins now go to this copy of Rave" : before ? "Rave took the website joins back from the Roblox launcher" : "Play on roblox.com now starts Roblox through Rave", logType::info);
 	}
 	discord::start();
 	updater::start(window::dx::hwnd);

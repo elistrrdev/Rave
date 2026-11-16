@@ -30,6 +30,21 @@ namespace
         return L"\"" + sys::exePath() + L"\" \"%1\"";
     }
 
+    bool isRaveCommand(const std::wstring& cmd)
+    {
+        std::wstring exe;
+        if (!cmd.empty() && cmd[0] == L'"')
+        {
+            size_t end = cmd.find(L'"', 1);
+            exe = cmd.substr(1, end == std::wstring::npos ? std::wstring::npos : end - 1);
+        }
+        else
+            exe = cmd.substr(0, cmd.find(L' '));
+        size_t slash = exe.find_last_of(L"\\/");
+        std::wstring name = slash == std::wstring::npos ? exe : exe.substr(slash + 1);
+        return name.size() >= 8 && _wcsicmp(name.c_str() + name.size() - 8, L"rave.exe") == 0;
+    }
+
     std::wstring readDefault(const std::wstring& sub)
     {
         HKEY key;
@@ -205,12 +220,23 @@ bool protocol::registered()
     return !cmd.empty() && _wcsicmp(cmd.c_str(), command().c_str()) == 0;
 }
 
+bool protocol::otherRave()
+{
+    std::wstring cmd = readDefault(std::wstring(kKey) + L"\\shell\\open\\command");
+    return !cmd.empty() && !registered() && isRaveCommand(cmd);
+}
+
 bool protocol::enable(std::string& error)
 {
     if (registered())
         return true;
 
-    if (!saveBackup())
+    bool saved;
+    if (otherRave())
+        saved = paths::exists(backupPath()) || writeFile(backupPath(), "{\r\n    \"existed\": false,\r\n    \"values\": []\r\n}\r\n");
+    else
+        saved = saveBackup();
+    if (!saved)
     {
         error = "could not save the current roblox-player handler";
         return false;
@@ -250,8 +276,22 @@ bool protocol::disable(std::string& error)
         RegCloseKey(classes);
     }
 
+    bool restore = haveBackup && v["existed"].type == json::Value::Type::Bool && v["existed"].boolean;
+    for (size_t i = 0; restore && i < v["values"].items.size(); ++i)
+    {
+        const json::Value& e = v["values"][i];
+        if (_stricmp(e["key"].str().c_str(), "shell\\open\\command") != 0 || !e["name"].str().empty())
+            continue;
+        std::vector<BYTE> data = unhex(e["data"].str());
+        std::wstring cmd((const wchar_t*)data.data(), data.size() / sizeof(wchar_t));
+        while (!cmd.empty() && cmd.back() == L'\0')
+            cmd.pop_back();
+        if (isRaveCommand(cmd))
+            restore = false;
+    }
+
     bool ok = true;
-    if (haveBackup && v["existed"].type == json::Value::Type::Bool && v["existed"].boolean)
+    if (restore)
     {
         HKEY root;
         ok = RegCreateKeyExW(HKEY_CURRENT_USER, kKey, 0, nullptr, 0, KEY_WRITE, nullptr, &root, nullptr) == ERROR_SUCCESS;
